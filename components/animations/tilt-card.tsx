@@ -1,10 +1,10 @@
 "use client"
 
 import React, { useRef, useState, useEffect } from "react"
-import { motion, useMotionValue, useSpring, useTransform } from "framer-motion"
+import { motion, useMotionValue, useSpring, useTransform, HTMLMotionProps } from "framer-motion"
 import { cn } from "@/lib/utils"
 
-interface TiltCardProps extends React.HTMLAttributes<HTMLDivElement> {
+interface TiltCardProps extends HTMLMotionProps<"div"> {
   children: React.ReactNode
   maxTilt?: number
   scale?: number

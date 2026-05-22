@@ -25,7 +25,8 @@ import {
   Calendar,
   ChevronRight,
 } from "lucide-react"
-import { VideoPlayer } from "@/components/dashboard/video-player"
+import { useRouter } from "next/navigation"
+import { ReportMistakeButton } from "@/components/report-mistake-button"
 
 interface Course {
   id: string
@@ -96,6 +97,7 @@ function isUuid(value: string) {
 
 export default function CoursePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
+  const router = useRouter()
   const [activeTab, setActiveTab] = useState("videos")
   const [courseData, setCourseData] = useState<Course | null>(null)
   const [videos, setVideos] = useState<VideoLecture[]>([])
@@ -104,7 +106,6 @@ export default function CoursePage({ params }: { params: Promise<{ id: string }>
   const [notes, setNotes] = useState<StudyNote[]>([])
   const [solvedAnswers, setSolvedAnswers] = useState<SolvedAnswer[]>([])
   const [loading, setLoading] = useState(true)
-  const [selectedVideo, setSelectedVideo] = useState<VideoLecture | null>(null)
 
   useEffect(() => {
     const fetchCourseData = async () => {
@@ -158,9 +159,9 @@ export default function CoursePage({ params }: { params: Promise<{ id: string }>
           .order("lecture_number", { ascending: true }),
         supabase
           .from("previous_questions")
-          .select("id, question_text, exam_type, exam_year, question_number, file_url")
+          .select("id, question_text, exam_type, question_number, file_url")
           .eq("course_id", course.id)
-          .order("exam_year", { ascending: false }),
+          .order("question_number", { ascending: true }),
         supabase
           .from("exam_suggestions")
           .select("id, title, content, priority, exam_type, created_at")
@@ -283,7 +284,10 @@ export default function CoursePage({ params }: { params: Promise<{ id: string }>
                   </div>
                   <Progress value={0} className="h-2" />
                 </div>
-                <Button className="w-full">
+                <Button 
+                  className="w-full"
+                  onClick={() => videos.length > 0 && router.push(`/dashboard/study-zone?videoId=${videos[0].id}`)}
+                >
                   <Play className="w-4 h-4 mr-2" />
                   Continue Learning
                 </Button>
@@ -361,23 +365,22 @@ export default function CoursePage({ params }: { params: Promise<{ id: string }>
                         </span>
                       </div>
                     </div>
-                    <Button variant="default" size="sm" onClick={() => setSelectedVideo(video)}>
-                      Watch
-                    </Button>
+                    <div className="flex flex-col items-end gap-2">
+                      <Button variant="default" size="sm" onClick={() => router.push(`/dashboard/study-zone?videoId=${video.id}`)}>
+                        Watch
+                      </Button>
+                      <ReportMistakeButton 
+                        materialType="video"
+                        materialId={video.id}
+                        materialTitle={video.title}
+                        variant="ghost"
+                        className="h-6 text-[10px] uppercase text-muted-foreground hover:text-[#FF3B30] hover:bg-[#FF3B30]/10 px-2"
+                      />
+                    </div>
                   </CardContent>
                 </Card>
               ))}
             </div>
-
-            {selectedVideo && (
-              <VideoPlayer
-                videoId={selectedVideo.id}
-                videoKey={selectedVideo.video_url}
-                title={selectedVideo.title}
-                isOpen={!!selectedVideo}
-                onClose={() => setSelectedVideo(null)}
-              />
-            )}
           </TabsContent>
 
           {/* Midterm Questions Tab */}
@@ -405,7 +408,7 @@ export default function CoursePage({ params }: { params: Promise<{ id: string }>
                           <p className="text-xs text-muted-foreground">Question {paper.question_number ?? "N/A"}</p>
                         </div>
                       </div>
-                      <Badge variant="outline">{paper.exam_year ?? "Year TBA"}</Badge>
+                      <Badge variant="outline">{paper.exam_type ?? "Exam"}</Badge>
                     </div>
                     <div className="flex items-center justify-between">
                       {paper.file_url ? (
@@ -456,7 +459,7 @@ export default function CoursePage({ params }: { params: Promise<{ id: string }>
                           <p className="text-xs text-muted-foreground">Question {paper.question_number ?? "N/A"}</p>
                         </div>
                       </div>
-                      <Badge variant="outline">{paper.exam_year ?? "Year TBA"}</Badge>
+                      <Badge variant="outline">{paper.exam_type ?? "Exam"}</Badge>
                     </div>
                     <div className="flex items-center justify-between">
                       {paper.file_url ? (
@@ -518,6 +521,15 @@ export default function CoursePage({ params }: { params: Promise<{ id: string }>
                         View Guide
                       </Button>
                     </div>
+                    <div className="mt-2 pt-2 border-t border-white/5 flex justify-end">
+                      <ReportMistakeButton 
+                        materialType="suggestion"
+                        materialId={suggestion.id}
+                        materialTitle={suggestion.title}
+                        variant="ghost"
+                        className="h-6 text-[10px] uppercase text-muted-foreground hover:text-[#FF3B30] hover:bg-[#FF3B30]/10 px-2"
+                      />
+                    </div>
                   </CardContent>
                 </Card>
               ))}
@@ -568,6 +580,15 @@ export default function CoursePage({ params }: { params: Promise<{ id: string }>
                         Read Note
                       </Button>
                     )}
+                    <div className="mt-2 pt-2 border-t border-white/5 flex justify-end">
+                      <ReportMistakeButton 
+                        materialType="note"
+                        materialId={note.id}
+                        materialTitle={note.title}
+                        variant="ghost"
+                        className="h-6 text-[10px] uppercase text-muted-foreground hover:text-[#FF3B30] hover:bg-[#FF3B30]/10 px-2"
+                      />
+                    </div>
                   </CardContent>
                 </Card>
               ))}
@@ -613,6 +634,15 @@ export default function CoursePage({ params }: { params: Promise<{ id: string }>
                           </a>
                         </Button>
                       )}
+                    </div>
+                    <div className="mt-2 pt-2 border-t border-white/5 flex justify-end">
+                      <ReportMistakeButton 
+                        materialType="solved_answer"
+                        materialId={solution.id}
+                        materialTitle={solution.answer_text}
+                        variant="ghost"
+                        className="h-6 text-[10px] uppercase text-muted-foreground hover:text-[#FF3B30] hover:bg-[#FF3B30]/10 px-2"
+                      />
                     </div>
                   </CardContent>
                 </Card>

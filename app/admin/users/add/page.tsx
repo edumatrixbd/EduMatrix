@@ -105,7 +105,7 @@ export default function AddStudentPage() {
                     type="email"
                     value={formData.email}
                     onChange={handleChange}
-                    placeholder="john@edumatrix.com"
+                    placeholder="john@tensionনাই.com"
                     required
                   />
                 </div>

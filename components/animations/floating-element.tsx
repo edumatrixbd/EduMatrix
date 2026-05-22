@@ -1,11 +1,11 @@
 "use client"
 
 import React, { useState, useEffect } from "react"
-import { motion } from "framer-motion"
+import { motion, HTMLMotionProps } from "framer-motion"
 import { cn } from "@/lib/utils"
 
-interface FloatingElementProps extends React.HTMLAttributes<HTMLDivElement> {
-  children: React.ReactNode
+interface FloatingElementProps extends HTMLMotionProps<"div"> {
+  children?: React.ReactNode
   yOffset?: number
   xOffset?: number
   duration?: number

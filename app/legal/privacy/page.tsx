@@ -1,8 +1,8 @@
 import { Metadata } from "next"
 
 export const metadata: Metadata = {
-  title: "Privacy Policy | EduMatrix",
-  description: "EduMatrix privacy policy and data handling information.",
+  title: "Privacy Policy | tensionনাই",
+  description: "tensionনাই privacy policy and data handling information.",
 }
 
 export default function PrivacyPolicy() {
@@ -41,7 +41,7 @@ export default function PrivacyPolicy() {
       <section className="mt-8">
         <h2>4. Contact Us</h2>
         <p>
-          If you have any questions about this Privacy Policy, please contact us at support@edumatrix.com.
+          If you have any questions about this Privacy Policy, please contact us at support@tensionনাই.com.
         </p>
       </section>
     </div>

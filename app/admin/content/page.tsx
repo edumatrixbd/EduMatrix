@@ -7,12 +7,13 @@ import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Video, FileQuestion, Lightbulb, BookOpen, CheckCircle } from "lucide-react"
 import Link from "next/link"
+import { toast } from "sonner"
 
 const contentTypes = [
-  { id: "videos", label: "Video Lectures", icon: Video, color: "from-blue-500 to-blue-600" },
-  { id: "questions", label: "Previous Questions", icon: FileQuestion, color: "from-purple-500 to-purple-600" },
-  { id: "suggestions", label: "Exam Suggestions", icon: Lightbulb, color: "from-amber-500 to-amber-600" },
-  { id: "notes", label: "Study Notes", icon: BookOpen, color: "from-emerald-500 to-emerald-600" },
+  { id: "videos", label: "Video Lectures", icon: Video, color: "from-[#FFB00F] to-[#FFB00F]/80" },
+  { id: "questions", label: "Previous Questions", icon: FileQuestion, color: "from-[#FF3B30] to-[#FF3B30]/80" },
+  { id: "suggestions", label: "Exam Suggestions", icon: Lightbulb, color: "from-[#FFB00F] to-[#FFB00F]/60" },
+  { id: "notes", label: "Study Notes", icon: BookOpen, color: "from-slate-700 to-slate-900" },
   { id: "solved", label: "Solved Answers", icon: CheckCircle, color: "from-pink-500 to-pink-600" },
 ]
 
@@ -88,13 +89,22 @@ function ContentList({ type }: { type: string }) {
     try {
       setLoading(true)
       const response = await fetch(`/api/admin/content/${type}`)
-      const data = await response.json()
-      if (!response.ok || !Array.isArray(data)) {
-        setError(data?.error ?? `Could not load ${type}. Check the Supabase table.`)
+      const text = await response.text()
+      let result: any = {}
+      if (text) {
+        try {
+          result = JSON.parse(text)
+        } catch (e) {
+          console.error("Failed to parse admin content response:", e)
+        }
+      }
+      
+      if (!response.ok || !result || !Array.isArray(result.data)) {
+        setError(result?.error ?? `Could not load ${type}. Server returned ${response.status}`)
         setContent([])
         return
       }
-      setContent(data)
+      setContent(result.data)
       setError(null)
     } catch (error) {
       console.error("Error fetching content:", error)
@@ -106,12 +116,18 @@ function ContentList({ type }: { type: string }) {
   }
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure?")) return
+    if (!confirm("Are you sure you want to delete this content? This action cannot be undone.")) return
+    
+    const toastId = toast.loading("Deleting content...")
     try {
-      await fetch(`/api/admin/content/${type}/${id}`, { method: "DELETE" })
+      const response = await fetch(`/api/admin/content/${type}/${id}`, { method: "DELETE" })
+      if (!response.ok) throw new Error("Failed to delete content")
+      
       setContent(content.filter(c => c.id !== id))
-    } catch (error) {
+      toast.success("Content deleted successfully", { id: toastId })
+    } catch (error: any) {
       console.error("Error deleting content:", error)
+      toast.error(error.message || "Failed to delete content", { id: toastId })
     }
   }
 
@@ -132,8 +148,11 @@ function ContentList({ type }: { type: string }) {
       {content.map((item) => (
         <div key={item.id} className="flex items-center justify-between p-4 border border-border rounded-lg hover:bg-muted/50">
           <div>
-            <h3 className="font-medium">{item.title || item.question_text || item.content || "Untitled"}</h3>
-            <p className="text-sm text-muted-foreground">{item.description || ""}</p>
+            <p className="font-semibold">{item.title || item.question_text || item.content || "Untitled"}</p>
+            <p className="text-sm text-slate-500 mt-1">
+              {item.university?.short_name || item.university?.name || "N/A"} • {item.department?.short_name || item.department?.name || "N/A"} • Batch {item.batch?.batch_number || "N/A"}
+              {item.course?.course_name ? ` • ${item.course.course_name}` : ""}
+            </p>
           </div>
           <div className="flex gap-2">
             <Link href={`/admin/content/${type}/${item.id}`}>

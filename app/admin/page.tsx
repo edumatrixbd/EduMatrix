@@ -21,18 +21,31 @@ import Link from "next/link"
 import { useEffect, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { formatDistanceToNow } from "date-fns"
+import { 
+  getTopPerformingCourses, 
+  getPlatformOverview,
+  getAdminActionableInsights
+} from "@/lib/admin/analytics"
+import { AdminActionableInsights } from "@/components/analytics/admin-actionable-insights"
+import { TopPerformingCourses } from "@/components/analytics/top-performing-courses"
 
 export default function AdminDashboard() {
   const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState([
-    { label: "Total Users", value: "0", change: "+0", trend: "up", icon: Users, color: "bg-blue-500" },
-    { label: "Total Courses", value: "0", change: "+0", trend: "up", icon: BookOpen, color: "bg-purple-500" },
-    { label: "Video Lectures", value: "0", change: "+0", trend: "up", icon: Video, color: "bg-emerald-500" },
-    { label: "Question Papers", value: "0", change: "+0", trend: "up", icon: FileQuestion, color: "bg-amber-500" },
+    { label: "Total Users", value: "0", change: "+0", trend: "up", icon: Users },
+    { label: "Total Courses", value: "0", change: "+0", trend: "up", icon: BookOpen },
+    { label: "Video Lectures", value: "0", change: "+0", trend: "up", icon: Video },
+    { label: "Question Papers", value: "0", change: "+0", trend: "up", icon: FileQuestion },
   ])
   const [recentUsersData, setRecentUsersData] = useState<any[]>([])
   const [topCoursesData, setTopCoursesData] = useState<any[]>([])
   const [recentUploadsData, setRecentUploadsData] = useState<any[]>([])
+  const [adminInsights, setAdminInsights] = useState({
+    pendingPayments: 0,
+    unreadFeedback: 0,
+    rejectedPayments: 0,
+    inactiveCourses: 0
+  })
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -42,40 +55,44 @@ export default function AdminDashboard() {
 
         const [
           studentsRes, coursesRes, videosRes, questionsRes,
-          recentUsersRes, coursesListRes,
-          recentVideosRes, recentQuestionsRes, recentNotesRes
+          recentUsersRes, 
+          recentVideosRes, recentQuestionsRes, recentNotesRes,
+          perfData, insightsData, overview
         ] = await Promise.all([
-          supabase.from("profiles").select("id", { count: "exact", head: true }),
+          supabase.from("profiles").select("id", { count: "exact", head: true }).eq('role', 'student'),
           supabase.from("courses").select("id", { count: "exact", head: true }),
           supabase.from("video_lectures").select("id", { count: "exact", head: true }),
           supabase.from("previous_questions").select("id", { count: "exact", head: true }),
-          supabase.from("profiles").select("name, email, semester, created_at").order("created_at", { ascending: false }).limit(5),
-          supabase.from("courses").select("course_name").order("created_at", { ascending: false }).limit(5),
+          supabase.from("profiles").select("full_name, email, created_at, student_profiles(semester)").eq('role', 'student').order("created_at", { ascending: false }).limit(5),
           supabase.from("video_lectures").select("title, created_at, courses(course_name)").order("created_at", { ascending: false }).limit(2),
           supabase.from("previous_questions").select("question_text, created_at, courses(course_name)").order("created_at", { ascending: false }).limit(2),
           supabase.from("study_notes").select("title, created_at, courses(course_name)").order("created_at", { ascending: false }).limit(2),
+          getTopPerformingCourses(),
+          getAdminActionableInsights(),
+          getPlatformOverview()
         ])
 
         setStats([
-          { label: "Total Users", value: (studentsRes.count || 0).toString(), change: "+0", trend: "up", icon: Users, color: "bg-blue-500" },
-          { label: "Total Courses", value: (coursesRes.count || 0).toString(), change: "+0", trend: "up", icon: BookOpen, color: "bg-purple-500" },
-          { label: "Video Lectures", value: (videosRes.count || 0).toString(), change: "+0", trend: "up", icon: Video, color: "bg-emerald-500" },
-          { label: "Question Papers", value: (questionsRes.count || 0).toString(), change: "+0", trend: "up", icon: FileQuestion, color: "bg-amber-500" },
+          { label: "Total Users", value: (studentsRes.count || 0).toString(), change: "+0", trend: "up", icon: Users },
+          { label: "Total Courses", value: (coursesRes.count || 0).toString(), change: "+0", trend: "up", icon: BookOpen },
+          { label: "Revenue", value: `৳${overview.totalRevenue.toLocaleString()}`, change: "+0", trend: "up", icon: TrendingUp },
+          { label: "Video Lectures", value: (videosRes.count || 0).toString(), change: "+0", trend: "up", icon: Video },
         ])
 
         setRecentUsersData(recentUsersRes.data?.map(u => ({
-          name: u.name,
+          name: u.full_name,
           email: u.email,
-          semester: `Semester ${u.semester}`,
+          semester: u.student_profiles ? `Semester ${u.student_profiles.semester}` : "N/A",
           joinedAt: u.created_at ? formatDistanceToNow(new Date(u.created_at), { addSuffix: true }) : "recently"
         })) || [])
 
-        setTopCoursesData(coursesListRes.data?.map(c => ({
-          name: c.course_name,
-          views: 0,
-          students: 0,
-          progress: 100
-        })) || [])
+        setTopCoursesData(perfData || [])
+        setAdminInsights(insightsData || {
+          pendingPayments: 0,
+          unreadFeedback: 0,
+          rejectedPayments: 0,
+          inactiveCourses: 0
+        })
 
         const allUploads = [
           ...(recentVideosRes.data?.map(v => ({ type: "video", title: v.title, course: (v.courses as any)?.course_name, time: v.created_at })) || []),
@@ -113,16 +130,8 @@ export default function AdminDashboard() {
             Admin Dashboard
           </h1>
           <p className="text-muted-foreground mt-1">
-            Welcome back! Here is what is happening with EduMatrix today.
+            Welcome back! Here is what is happening with tensionনাই today.
           </p>
-        </div>
-        <div className="flex items-center gap-3">
-          <Link href="/admin/upload">
-            <Button>
-              <Upload className="w-4 h-4 mr-2" />
-              Upload Content
-            </Button>
-          </Link>
         </div>
       </motion.div>
 
@@ -134,23 +143,23 @@ export default function AdminDashboard() {
         className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
       >
         {stats.map((stat) => (
-          <Card key={stat.label} className="hover:shadow-md transition-shadow">
+          <Card key={stat.label} className="bg-card border-border hover:border-primary/40 shadow-sm transition-all group">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
-                <div className={`w-12 h-12 rounded-xl ${stat.color} flex items-center justify-center`}>
-                  <stat.icon className="w-6 h-6 text-white" />
+                <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <stat.icon className="w-6 h-6 text-primary" />
                 </div>
                 <Badge
                   variant="secondary"
-                  className="bg-emerald-100 text-emerald-700"
+                  className="bg-destructive/10 text-destructive border-none font-black text-[10px] uppercase"
                 >
                   <TrendingUp className="w-3 h-3 mr-1" />
                   {stat.change}
                 </Badge>
               </div>
               <div className="mt-4">
-                <div className="text-3xl font-bold text-foreground">{stat.value}</div>
-                <div className="text-sm text-muted-foreground">{stat.label}</div>
+                <div className="text-3xl font-black text-foreground">{stat.value}</div>
+                <div className="text-sm text-muted-foreground font-bold uppercase tracking-wider text-[10px] mt-1">{stat.label}</div>
               </div>
             </CardContent>
           </Card>
@@ -172,7 +181,7 @@ export default function AdminDashboard() {
                 <CardTitle>Recent Users</CardTitle>
                 <CardDescription>New students who joined the platform</CardDescription>
               </div>
-              <Link href="/admin/users">
+              <Link href="/admin/students">
                 <Button variant="ghost" size="sm" className="text-primary">
                   View All
                   <ArrowRight className="w-4 h-4 ml-1" />
@@ -210,36 +219,24 @@ export default function AdminDashboard() {
           </Card>
         </motion.div>
 
-        {/* Top Courses */}
+        {/* Actionable Insights */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.3 }}
         >
-          <Card>
-            <CardHeader>
-              <CardTitle>Top Courses</CardTitle>
-              <CardDescription>Most viewed courses this month</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {loading ? <p className="text-sm text-muted-foreground text-center py-4">Loading courses...</p> : 
-               topCoursesData.length === 0 ? <p className="text-sm text-muted-foreground text-center py-4">No courses found.</p> :
-               topCoursesData.map((course, index) => (
-                <div key={index} className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm font-medium text-foreground">{course.name}</p>
-                    <span className="text-xs text-muted-foreground">
-                      {course.views.toLocaleString()} views
-                    </span>
-                  </div>
-                  <Progress value={course.progress} className="h-2" />
-                  <p className="text-xs text-muted-foreground">
-                    {course.students} students enrolled
-                  </p>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
+          <AdminActionableInsights 
+            insights={adminInsights} 
+          />
+        </motion.div>
+
+        {/* Top Performing Courses */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.35 }}
+        >
+          <TopPerformingCourses courses={topCoursesData} />
         </motion.div>
       </div>
 
@@ -273,15 +270,9 @@ export default function AdminDashboard() {
                     key={index}
                     className="flex items-center gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors"
                   >
-                    <div
-                      className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                        upload.type === "video"
-                          ? "bg-blue-100 text-blue-600"
-                          : upload.type === "question"
-                          ? "bg-purple-100 text-purple-600"
-                          : "bg-emerald-100 text-emerald-600"
-                      }`}
-                    >
+                  <div
+                    className="w-10 h-10 rounded-lg flex items-center justify-center bg-[#FFB00F]/10 text-[#FFB00F]"
+                  >
                       {upload.type === "video" ? (
                         <Video className="w-5 h-5" />
                       ) : upload.type === "question" ? (
@@ -318,43 +309,43 @@ export default function AdminDashboard() {
               <CardDescription>Common administrative tasks</CardDescription>
             </CardHeader>
             <CardContent className="grid grid-cols-2 gap-4">
-              <Link href="/admin/users">
-                <div className="p-4 rounded-xl border border-border hover:border-primary/50 hover:shadow-md transition-all cursor-pointer text-center">
-                  <div className="w-12 h-12 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center mx-auto mb-3">
-                    <UserPlus className="w-6 h-6" />
+              <Link href="/admin/students">
+                <div className="p-4 rounded-xl bg-card border border-border hover:border-primary/40 shadow-sm transition-all cursor-pointer text-center group">
+                  <div className="w-12 h-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform">
+                    <Users className="w-6 h-6" />
                   </div>
-                  <p className="font-medium text-foreground">Manage Users</p>
-                  <p className="text-xs text-muted-foreground">View & edit users</p>
+                  <p className="font-bold text-foreground text-sm">Manage Students</p>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-bold">View & edit profiles</p>
                 </div>
               </Link>
 
               <Link href="/admin/courses">
-                <div className="p-4 rounded-xl border border-border hover:border-primary/50 hover:shadow-md transition-all cursor-pointer text-center">
-                  <div className="w-12 h-12 rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center mx-auto mb-3">
+                <div className="p-4 rounded-xl bg-card border border-border hover:border-primary/40 shadow-sm transition-all cursor-pointer text-center group">
+                  <div className="w-12 h-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform">
                     <BookOpen className="w-6 h-6" />
                   </div>
-                  <p className="font-medium text-foreground">Manage Courses</p>
-                  <p className="text-xs text-muted-foreground">Add & edit courses</p>
+                  <p className="font-bold text-foreground text-sm">Manage Courses</p>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-bold">Add & edit courses</p>
                 </div>
               </Link>
 
               <Link href="/admin/upload">
-                <div className="p-4 rounded-xl border border-border hover:border-primary/50 hover:shadow-md transition-all cursor-pointer text-center">
-                  <div className="w-12 h-12 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto mb-3">
+                <div className="p-4 rounded-xl bg-card border border-border hover:border-primary/40 shadow-sm transition-all cursor-pointer text-center group">
+                  <div className="w-12 h-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform">
                     <Upload className="w-6 h-6" />
                   </div>
-                  <p className="font-medium text-foreground">Upload Content</p>
-                  <p className="text-xs text-muted-foreground">Add new materials</p>
+                  <p className="font-bold text-foreground text-sm">Upload Content</p>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-bold">Add new materials</p>
                 </div>
               </Link>
 
               <Link href="/admin/analytics">
-                <div className="p-4 rounded-xl border border-border hover:border-primary/50 hover:shadow-md transition-all cursor-pointer text-center">
-                  <div className="w-12 h-12 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center mx-auto mb-3">
+                <div className="p-4 rounded-xl bg-card border border-border hover:border-primary/40 shadow-sm transition-all cursor-pointer text-center group">
+                  <div className="w-12 h-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform">
                     <Activity className="w-6 h-6" />
                   </div>
-                  <p className="font-medium text-foreground">View Analytics</p>
-                  <p className="text-xs text-muted-foreground">Platform insights</p>
+                  <p className="font-bold text-foreground text-sm">View Analytics</p>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-bold">Platform insights</p>
                 </div>
               </Link>
             </CardContent>

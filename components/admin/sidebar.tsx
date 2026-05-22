@@ -1,5 +1,6 @@
 "use client"
 
+import * as React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
@@ -20,20 +21,17 @@ import {
   BarChart3,
   FileText,
   Bell,
+  Shield,
+  FileCheck,
+  Layers,
+  CreditCard,
+  Sparkles,
+  AlertTriangle,
+  DollarSign
 } from "lucide-react"
-
-const navigation = [
-  { name: "Overview", href: "/admin", icon: LayoutDashboard },
-  { name: "Analytics", href: "/admin/analytics", icon: BarChart3 },
-  { name: "Users", href: "/admin/users", icon: Users },
-  { name: "Courses", href: "/admin/courses", icon: BookOpen },
-  { name: "Content", href: "/admin/content", icon: FileText },
-  { name: "Notifications", href: "/admin/notifications", icon: Bell },
-]
-
-const bottomNavigation = [
-  { name: "Settings", href: "/admin/settings", icon: Settings },
-]
+import { Logo } from "@/components/shared/logo"
+import { createClient } from "@/lib/supabase/client"
+import { useAdminPermissions } from "@/lib/hooks/use-permissions"
 
 interface AdminSidebarProps {
   isCollapsed: boolean
@@ -42,26 +40,62 @@ interface AdminSidebarProps {
 
 export function AdminSidebar({ isCollapsed, onToggle }: AdminSidebarProps) {
   const pathname = usePathname()
+  const [role, setRole] = React.useState<string>("admin")
+  const { hasPermission } = useAdminPermissions()
+
+  React.useEffect(() => {
+    const fetchRole = async () => {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", user.id)
+          .single()
+        if (profile) setRole(profile.role)
+      }
+    }
+    fetchRole()
+  }, [])
+
+  const navigation = [
+    { name: "Overview", href: "/admin", icon: LayoutDashboard, permission: "dashboard_access" },
+    { name: "Analytics", href: "/admin/analytics", icon: BarChart3, permission: "analytics_view" },
+    { name: "Hierarchy", href: "/admin/hierarchy", icon: Shield, permission: "courses_view" },
+    { name: "Instructors", href: "/admin/instructors/applications", icon: GraduationCap, permission: "instructors_view" },
+    { name: "Students", href: "/admin/students", icon: Users, permission: "students_view" },
+    { name: "Courses", href: "/admin/courses", icon: BookOpen, permission: "courses_view" },
+    { name: "Content", href: "/admin/content", icon: FileText, permission: "content_upload" },
+    { name: "Payments", href: "/admin/payments", icon: CreditCard, permission: "payments_view" },
+    { name: "Feedback", href: "/admin/feedback", icon: AlertTriangle, permission: "feedback_view" },
+    { name: "Notifications", href: "/admin/notifications", icon: Bell, permission: "notifications_create" },
+    ...(role === "super_admin" || role === "superadmin" ? [
+      { name: "Pricing Panel", href: "/admin/pricing", icon: DollarSign, permission: "settings_manage" },
+      { name: "Activity Logs", href: "/admin/activity-logs", icon: FileCheck, permission: "activity_logs_view" },
+      { name: "Manage Admins", href: "/admin/users/create", icon: Shield, permission: "settings_manage" },
+      { name: "Permissions", href: "/admin/permissions", icon: Shield, permission: "settings_manage" }
+    ] : []),
+  ].filter(item => hasPermission(item.permission))
+
+  const bottomNavigation = [
+    { name: "Settings", href: "/admin/settings", icon: Settings, permission: "settings_manage" },
+  ].filter(item => hasPermission(item.permission))
 
   return (
     <aside
       className={cn(
-        "fixed left-0 top-0 z-40 h-screen bg-slate-900 text-white transition-all duration-300 flex flex-col",
-        isCollapsed ? "w-[70px]" : "w-64"
+        "fixed left-0 top-0 z-40 h-screen bg-card text-card-foreground border-r border-border transition-all duration-300 flex flex-col",
+        isCollapsed ? "w-[70px]" : "w-56"
       )}
     >
       {/* Header */}
-      <div className="h-16 flex items-center justify-between px-4 border-b border-white/10">
+      <div className="h-16 flex items-center justify-between px-4 border-b border-border">
         <Link href="/admin" className="flex items-center gap-2 overflow-hidden">
-          <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <GraduationCap className="h-5 w-5" />
-          </div>
+          <Logo className={cn("h-9", isCollapsed && "h-8 px-1")} />
           {!isCollapsed && (
             <div>
-              <span className="text-lg font-bold whitespace-nowrap text-white">
-                EduMatrix
-              </span>
-              <span className="block text-xs text-white/60">Admin Panel</span>
+              <span className="block text-xs text-muted-foreground">Admin Panel</span>
             </div>
           )}
         </Link>
@@ -69,7 +103,7 @@ export function AdminSidebar({ isCollapsed, onToggle }: AdminSidebarProps) {
           variant="ghost"
           size="icon"
           onClick={onToggle}
-          className={cn("h-8 w-8 flex-shrink-0 text-white/70 hover:text-white hover:bg-white/10", isCollapsed && "hidden")}
+          className={cn("h-8 w-8 flex-shrink-0 text-muted-foreground hover:text-foreground hover:bg-muted", isCollapsed && "hidden")}
         >
           <ChevronLeft className="h-4 w-4" />
         </Button>
@@ -86,10 +120,10 @@ export function AdminSidebar({ isCollapsed, onToggle }: AdminSidebarProps) {
                 href={item.href}
                 prefetch={true}
                 className={cn(
-                  "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
+                  "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
                   isActive
                     ? "bg-primary text-primary-foreground"
-                    : "text-white/70 hover:bg-white/10 hover:text-white",
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground",
                   isCollapsed && "justify-center px-2"
                 )}
                 title={isCollapsed ? item.name : undefined}
@@ -103,7 +137,7 @@ export function AdminSidebar({ isCollapsed, onToggle }: AdminSidebarProps) {
       </ScrollArea>
 
       {/* Bottom Section */}
-      <div className="border-t border-white/10 p-3 space-y-2">
+      <div className="border-t border-border p-3 space-y-2">
         {bottomNavigation.map((item) => {
           const isActive = pathname === item.href
           return (
@@ -112,10 +146,10 @@ export function AdminSidebar({ isCollapsed, onToggle }: AdminSidebarProps) {
               href={item.href}
               prefetch={true}
               className={cn(
-                "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
+                "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
                 isActive
                   ? "bg-primary text-primary-foreground"
-                  : "text-white/70 hover:bg-white/10 hover:text-white",
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground",
                 isCollapsed && "justify-center px-2"
               )}
               title={isCollapsed ? item.name : undefined}
@@ -130,7 +164,7 @@ export function AdminSidebar({ isCollapsed, onToggle }: AdminSidebarProps) {
         <Link
           href="/auth/logout"
           className={cn(
-            "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors text-red-400 hover:bg-red-500/10",
+            "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors text-red-400 hover:bg-red-500/10",
             isCollapsed && "justify-center px-2"
           )}
           title={isCollapsed ? "Logout" : undefined}
@@ -142,7 +176,7 @@ export function AdminSidebar({ isCollapsed, onToggle }: AdminSidebarProps) {
         {/* User Profile */}
         <div
           className={cn(
-            "flex items-center gap-3 p-2 rounded-lg bg-white/5 mt-2",
+            "flex items-center gap-3 p-2 rounded-lg bg-muted mt-2",
             isCollapsed && "justify-center"
           )}
         >
@@ -153,8 +187,8 @@ export function AdminSidebar({ isCollapsed, onToggle }: AdminSidebarProps) {
           </Avatar>
           {!isCollapsed && (
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate text-white">Admin User</p>
-              <p className="text-xs text-white/60 truncate">admin@edumatrix.com</p>
+              <p className="text-sm font-medium truncate text-foreground">Admin User</p>
+              <p className="text-xs text-muted-foreground truncate">admin@tensionনাই.com</p>
             </div>
           )}
         </div>

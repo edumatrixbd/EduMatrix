@@ -8,7 +8,16 @@ export async function GET(request: Request) {
 
   if (code) {
     const supabase = await createClient()
-    await supabase.auth.exchangeCodeForSession(code)
+    const { data, error } = await supabase.auth.exchangeCodeForSession(code)
+
+    // Block unverified users even through OAuth/magic-link callback
+    if (!error && data.user && !data.user.email_confirmed_at) {
+      await supabase.auth.signOut()
+      const verifyUrl = new URL('/verify-otp', requestUrl.origin)
+      verifyUrl.searchParams.set('email', data.user.email || '')
+      verifyUrl.searchParams.set('type', 'signup')
+      return NextResponse.redirect(verifyUrl)
+    }
   }
 
   return NextResponse.redirect(new URL(next, requestUrl.origin))

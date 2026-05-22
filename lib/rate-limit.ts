@@ -8,11 +8,11 @@
  * Default: 60 requests per IP per minute.
  */
 
+import { NextRequest, NextResponse } from "next/server"
+import { redis } from "./redis"
+
 const WINDOW_MS = 60_000 // 1 minute
 const MAX_REQUESTS = 60  // per window per IP
-
-// IP → array of timestamps (ms)
-const requestLog = new Map<string, number[]>()
 
 export interface RateLimitResult {
   success: boolean
@@ -20,49 +20,58 @@ export interface RateLimitResult {
   reset: number // Unix ms when window resets
 }
 
-export function checkRateLimit(ip: string): RateLimitResult {
+export async function checkRateLimit(ip: string): Promise<RateLimitResult> {
   const now = Date.now()
   const windowStart = now - WINDOW_MS
+  
+  const key = `rate_limit:${ip}`
+  
+  try {
+    const pipeline = redis.pipeline()
+    // Remove scores before windowStart
+    pipeline.zremrangebyscore(key, 0, windowStart)
+    // Get count
+    pipeline.zcard(key)
+    // Add current timestamp
+    pipeline.zadd(key, { score: now, member: String(now) + Math.random().toString(36).substring(7) })
+    // Set expiry to keep DB clean
+    pipeline.expire(key, Math.ceil(WINDOW_MS / 1000))
 
-  // Prune stale timestamps
-  const timestamps = (requestLog.get(ip) ?? []).filter((t) => t > windowStart)
+    const results = await pipeline.exec()
+    const count = results[1] as number
 
-  if (timestamps.length >= MAX_REQUESTS) {
-    const oldestInWindow = timestamps[0]
+    if (count >= MAX_REQUESTS) {
+      return {
+        success: false,
+        remaining: 0,
+        reset: now + WINDOW_MS,
+      }
+    }
+
     return {
-      success: false,
-      remaining: 0,
-      reset: oldestInWindow + WINDOW_MS,
+      success: true,
+      remaining: Math.max(0, MAX_REQUESTS - (count + 1)),
+      reset: now + WINDOW_MS,
     }
-  }
-
-  timestamps.push(now)
-  requestLog.set(ip, timestamps)
-
-  // Periodic cleanup to avoid memory leak in long-running processes
-  if (Math.random() < 0.01) {
-    for (const [key, ts] of requestLog.entries()) {
-      if (ts.every((t) => t <= windowStart)) requestLog.delete(key)
+  } catch (error) {
+    console.error("Redis rate limit error:", error)
+    // Fallback to allow request if Redis is down
+    return {
+      success: true,
+      remaining: 1,
+      reset: now + WINDOW_MS,
     }
-  }
-
-  return {
-    success: true,
-    remaining: MAX_REQUESTS - timestamps.length,
-    reset: now + WINDOW_MS,
   }
 }
 
 /** Returns 429 NextResponse with rate-limit headers, or null if OK */
-import { NextRequest, NextResponse } from "next/server"
-
-export function withRateLimit(request: NextRequest): NextResponse | null {
+export async function withRateLimit(request: NextRequest): Promise<NextResponse | null> {
   const ip =
     request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
     request.headers.get("x-real-ip") ??
     "anonymous"
 
-  const result = checkRateLimit(ip)
+  const result = await checkRateLimit(ip)
 
   const headers = {
     "X-RateLimit-Limit": String(MAX_REQUESTS),

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import useSWR from "swr"
 import { motion } from "framer-motion"
 import { createClient } from "@/lib/supabase/client"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
@@ -10,12 +11,12 @@ import { Label } from "@/components/ui/label"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
-import { Upload, User, Lock, CreditCard, Sparkles, CalendarDays, CheckCircle2 } from "lucide-react"
+import { Upload, User, Lock, CreditCard, Sparkles, CalendarDays, CheckCircle2, GraduationCap, LogOut, Clock } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
 import { format } from "date-fns"
+import Link from "next/link"
 
 export default function SettingsPage() {
-  const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [user, setUser] = useState<any>(null)
   
@@ -28,7 +29,9 @@ export default function SettingsPage() {
     university: "",
     department: "",
     batch: "",
-    semester: ""
+    semester: "",
+    phone: "",
+    instructor_status: "none"
   })
   
   // Password state
@@ -37,45 +40,51 @@ export default function SettingsPage() {
   
   const { toast } = useToast()
 
-  useEffect(() => {
-    fetchUserData()
-  }, [])
+  const fetchProfileData = async () => {
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return null
+    
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('university, department, batch, semester, phone')
+      .eq('id', user.id)
+      .single()
 
-  const fetchUserData = async () => {
-    try {
-      const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      
-      if (user) {
-        setUser(user)
-        setFullName(user.user_metadata?.full_name || "")
-        setAvatarUrl(user.user_metadata?.avatar_url || "")
-        if (user.created_at) {
-          setJoinedDate(format(new Date(user.created_at), 'MMMM do, yyyy'))
-        }
+    const { data: application } = await supabase
+      .from('instructor_applications')
+      .select('status')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
 
-        // Fetch academic data from profiles table
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('university, department, batch, semester')
-          .eq('id', user.id)
-          .single()
-
-        if (profile) {
-          setAcademicData({
-            university: profile.university || "",
-            department: profile.department || "",
-            batch: profile.batch || "",
-            semester: profile.semester?.toString() || ""
-          })
-        }
-      }
-    } catch (error) {
-      console.error("Error fetching user:", error)
-    } finally {
-      setLoading(false)
-    }
+    return { user, profile, application }
   }
+
+  const { data, error, isLoading } = useSWR('profileData', fetchProfileData)
+
+  useEffect(() => {
+    if (data && data.user) {
+      setUser(data.user)
+      setFullName(data.user.user_metadata?.full_name || "")
+      setAvatarUrl(data.user.user_metadata?.avatar_url || "")
+      if (data.user.created_at) {
+        setJoinedDate(format(new Date(data.user.created_at), 'MMMM do, yyyy'))
+      }
+      
+      if (data.profile) {
+        setAcademicData({
+          university: data.profile.university || "",
+          department: data.profile.department || "",
+          batch: data.profile.batch || "",
+          semester: data.profile.semester?.toString() || "",
+          phone: data.profile.phone || "",
+          instructor_status: data.application?.status || "none"
+        })
+      }
+    }
+  }, [data])
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     try {
@@ -154,7 +163,8 @@ export default function SettingsPage() {
             university: academicData.university,
             department: academicData.department,
             batch: academicData.batch,
-            semester: parseInt(academicData.semester) || null
+            semester: parseInt(academicData.semester) || null,
+            phone: academicData.phone
           })
           .eq("id", user.id)
           
@@ -211,7 +221,7 @@ export default function SettingsPage() {
     }
   }
 
-  if (loading) {
+  if (isLoading) {
     return <div className="flex h-[400px] items-center justify-center">Loading settings...</div>
   }
 
@@ -341,6 +351,17 @@ export default function SettingsPage() {
                       placeholder="e.g. 1"
                     />
                   </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="phone">Phone Number</Label>
+                    <Input 
+                      id="phone" 
+                      type="tel"
+                      value={academicData.phone} 
+                      onChange={(e) => setAcademicData({...academicData, phone: e.target.value})}
+                      placeholder="017XXXXXXXX"
+                      required
+                    />
+                  </div>
                 </div>
 
                 <Button type="submit" disabled={saving}>
@@ -391,7 +412,41 @@ export default function SettingsPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="subscription">
+        <TabsContent value="subscription" className="space-y-6">
+          {/* Become an Instructor Link */}
+          {academicData.instructor_status === 'none' && (
+            <Card className="border-primary/20 bg-primary/5">
+              <CardContent className="p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="flex items-center gap-4 text-center sm:text-left">
+                  <div className="p-3 bg-primary/10 rounded-full">
+                    <GraduationCap className="w-6 h-6 text-primary" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-lg">Teach on UniHub</h4>
+                    <p className="text-sm text-muted-foreground">Apply to become an instructor and share your knowledge.</p>
+                  </div>
+                </div>
+                <Link href="/instructor/apply">
+                  <Button className="font-bold">Apply Now</Button>
+                </Link>
+              </CardContent>
+            </Card>
+          )}
+
+          {academicData.instructor_status === 'pending' && (
+            <Card className="border-amber-500/20 bg-amber-500/5">
+              <CardContent className="p-6 flex items-center gap-4">
+                <div className="p-3 bg-amber-500/10 rounded-full text-amber-500">
+                  <Clock className="w-6 h-6" />
+                </div>
+                <div>
+                  <h4 className="font-bold text-lg">Instructor Application Pending</h4>
+                  <p className="text-sm text-amber-600/70">Our team is reviewing your application. You'll be notified soon.</p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           <Card className="border-primary/20 shadow-premium overflow-hidden relative">
             <div className="absolute top-0 right-0 p-6 opacity-10">
               <Sparkles className="w-32 h-32 text-primary" />
@@ -443,6 +498,33 @@ export default function SettingsPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Danger Zone */}
+      <Card className="border-[#FF3B30]/20 bg-[#FF3B30]/5">
+        <CardHeader>
+          <CardTitle className="text-[#FF3B30] flex items-center gap-2">
+            <Lock className="w-5 h-5" />
+            Danger Zone
+          </CardTitle>
+          <CardDescription>Actions that are irreversible or sign you out of your account.</CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col sm:flex-row gap-4">
+          <Button 
+            variant="outline" 
+            className="border-[#FF3B30] text-[#FF3B30] hover:bg-[#FF3B30] hover:text-white transition-all font-bold"
+            onClick={() => window.location.href = '/auth/logout'}
+          >
+            <LogOut className="w-4 h-4 mr-2" />
+            Logout from Account
+          </Button>
+          <Button 
+            variant="ghost" 
+            className="text-[#FF3B30]/60 hover:text-[#FF3B30] transition-colors text-xs"
+          >
+            Delete Account Permanently
+          </Button>
+        </CardContent>
+      </Card>
     </div>
   )
 }

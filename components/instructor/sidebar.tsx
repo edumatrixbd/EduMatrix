@@ -19,12 +19,16 @@ import {
   LogOut,
   ChevronLeft,
   ChevronRight,
+  UploadCloud,
+  FileText,
 } from "lucide-react"
+import { Logo } from "@/components/shared/logo"
 
 const navigation = [
   { name: "Overview", href: "/instructor", icon: LayoutDashboard },
   { name: "My Courses", href: "/instructor/courses", icon: BookOpen },
   { name: "Students", href: "/instructor/students", icon: Users },
+  { name: "Course Content", href: "/instructor/content", icon: FileText },
   { name: "Earnings", href: "/instructor/earnings", icon: DollarSign },
   { name: "Payouts", href: "/instructor/payouts", icon: CreditCard },
   { name: "Announcements", href: "/instructor/notices", icon: Bell },
@@ -42,8 +46,8 @@ export function InstructorSidebar({ isCollapsed, onToggle, isMobile }: Instructo
   return (
     <aside
       className={cn(
-        "fixed left-0 top-0 z-40 h-screen bg-slate-900 text-white transition-all duration-300 flex flex-col",
-        isCollapsed ? "w-[70px]" : "w-64"
+        "fixed left-0 top-0 z-40 h-screen bg-white dark:bg-slate-900 text-slate-900 dark:text-white border-r border-slate-200 dark:border-white/10 transition-all duration-300 flex flex-col",
+        isCollapsed ? "w-[70px]" : "w-56"
       )}
     >
       {/* Toggle Button (Desktop) */}
@@ -51,7 +55,7 @@ export function InstructorSidebar({ isCollapsed, onToggle, isMobile }: Instructo
         variant="outline"
         size="icon"
         onClick={onToggle}
-        className="absolute -right-4 top-6 z-50 h-8 w-8 rounded-full border-slate-700 bg-slate-800 text-white hover:bg-slate-700 hidden lg:flex shadow-sm"
+        className="absolute -right-4 top-6 z-50 h-8 w-8 rounded-full border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-700 hidden lg:flex shadow-sm"
       >
         {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
       </Button>
@@ -62,15 +66,10 @@ export function InstructorSidebar({ isCollapsed, onToggle, isMobile }: Instructo
           className="flex items-center gap-2 overflow-hidden"
           onClick={() => isMobile && onToggle()}
         >
-          <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-indigo-600 text-white shadow-lg shadow-indigo-600/20">
-            <GraduationCap className="h-5 w-5" />
-          </div>
+          <Logo className={cn("h-9", isCollapsed && "h-8 px-1")} />
           {!isCollapsed && (
             <div className="min-w-0">
-              <span className="text-lg font-bold whitespace-nowrap text-white block truncate">
-                EduMatrix
-              </span>
-              <span className="block text-[10px] text-white/60 font-medium uppercase tracking-wider">Instructor Panel</span>
+              <span className="block text-[10px] text-slate-500 dark:text-white/60 font-medium uppercase tracking-wider">Instructor Panel</span>
             </div>
           )}
         </Link>
@@ -88,17 +87,17 @@ export function InstructorSidebar({ isCollapsed, onToggle, isMobile }: Instructo
                 href={item.href}
                 prefetch={true}
                 className={cn(
-                  "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200",
+                  "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200",
                   isActive
-                    ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/25"
-                    : "text-white/70 hover:bg-white/10 hover:text-white",
+                    ? "bg-primary text-white shadow-lg shadow-primary/25"
+                    : "text-slate-600 dark:text-white/70 hover:bg-slate-100 dark:hover:bg-white/10 hover:text-slate-900 dark:hover:text-white",
                   isCollapsed && "justify-center px-2"
                 )}
                 title={isCollapsed ? item.name : undefined}
               >
                 <Icon className={cn(
                   "h-5 w-5 flex-shrink-0",
-                  isActive ? "text-white" : "text-white/60"
+                  isActive ? "text-white" : "text-slate-500 dark:text-white/60"
                 )} />
                 {!isCollapsed && <span>{item.name}</span>}
               </Link>
@@ -114,7 +113,7 @@ export function InstructorSidebar({ isCollapsed, onToggle, isMobile }: Instructo
           prefetch={true}
           onClick={() => isMobile && onToggle()}
           className={cn(
-            "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all text-white/70 hover:bg-white/10 hover:text-white",
+            "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all text-slate-600 dark:text-white/70 hover:bg-slate-100 dark:hover:bg-white/10 hover:text-slate-900 dark:hover:text-white",
             isCollapsed && "justify-center px-2"
           )}
         >
@@ -125,7 +124,7 @@ export function InstructorSidebar({ isCollapsed, onToggle, isMobile }: Instructo
         <Link
           href="/auth/logout"
           className={cn(
-            "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all text-rose-400 hover:bg-rose-500/10",
+            "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all text-rose-400 hover:bg-rose-500/10",
             isCollapsed && "justify-center px-2"
           )}
         >
@@ -135,19 +134,19 @@ export function InstructorSidebar({ isCollapsed, onToggle, isMobile }: Instructo
 
         <div
           className={cn(
-            "flex items-center gap-3 p-2 rounded-lg bg-white/5 mt-2",
+            "flex items-center gap-3 p-2 rounded-lg bg-slate-100 dark:bg-white/5 mt-2",
             isCollapsed && "justify-center"
           )}
         >
-          <Avatar className="h-9 w-9 border border-indigo-500/30">
-            <AvatarFallback className="bg-indigo-600/20 text-indigo-400 text-xs font-bold uppercase">
+          <Avatar className="h-9 w-9 border border-primary/30">
+            <AvatarFallback className="bg-primary/20 text-primary text-xs font-bold uppercase">
               IN
             </AvatarFallback>
           </Avatar>
           {!isCollapsed && (
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-white truncate">Instructor</p>
-              <p className="text-[10px] text-white/40 truncate uppercase tracking-tighter">EduMatrix Partner</p>
+              <p className="text-sm font-semibold text-slate-900 dark:text-white truncate">Instructor</p>
+              <p className="text-[10px] text-slate-500 dark:text-white/40 truncate uppercase tracking-tighter">tensionনাই Partner</p>
             </div>
           )}
         </div>

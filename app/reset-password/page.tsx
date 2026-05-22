@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { GraduationCap, Lock, ArrowRight, Eye, EyeOff } from "lucide-react"
+import { Logo } from "@/components/shared/logo"
 
 export default function ResetPasswordPage() {
   return (
@@ -33,13 +34,10 @@ function ResetPasswordForm() {
 
   useEffect(() => {
     const prepareRecoverySession = async () => {
-      const code = searchParams.get("code")
+      const email = (searchParams.get("email") || "").toLowerCase()
 
-      if (code) {
-        const { error } = await supabase.auth.exchangeCodeForSession(code)
-        if (error) {
-          setError(error.message)
-        }
+      if (!email) {
+        setError("Invalid reset link. Please request a new OTP.")
       }
 
       setIsPreparingSession(false)
@@ -59,30 +57,58 @@ function ResetPasswordForm() {
     }
 
     setIsLoading(true)
+    const email = (searchParams.get("email") || "").toLowerCase()
 
-    const { error } = await supabase.auth.updateUser({ password })
-
-    if (error) {
-      setError(error.message)
+    if (!email) {
+      setError("Email is missing. Please restart the reset process.")
       setIsLoading(false)
       return
     }
 
-    setMessage("Password updated. Redirecting to your dashboard...")
-    router.refresh()
-    setTimeout(() => router.push("/dashboard"), 1000)
+    const response = await fetch("/api/auth/update-password", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    })
+
+    const data = await response.json()
+    if (!response.ok) {
+      setError(data.error || "Failed to update password")
+      setIsLoading(false)
+      return
+    }
+
+    setMessage("Password updated successfully! Redirecting to login...")
+    
+    // Determine redirect based on role
+    let redirectPath = "/login"
+    
+    try {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('email', email)
+        .single()
+      
+      if (profile) {
+        const role = profile.role.toLowerCase()
+        if (role === 'instructor') redirectPath = "/instructor/login"
+        else if (['admin', 'superadmin', 'super_admin'].includes(role)) redirectPath = "/admin/login"
+      }
+    } catch (e) {
+      console.warn("Failed to fetch role for redirect, defaulting to student login")
+    }
+
+    setTimeout(() => {
+      router.push(redirectPath)
+    }, 2000)
   }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-6">
       <div className="w-full max-w-md">
         <Link href="/" className="flex items-center gap-2 mb-8 justify-center">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <GraduationCap className="h-5 w-5" />
-          </div>
-          <span className="text-lg font-bold text-foreground">
-            EduMatrix
-          </span>
+          <Logo className="h-9" />
         </Link>
 
         <Card>

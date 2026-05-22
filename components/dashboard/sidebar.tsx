@@ -29,6 +29,7 @@ import {
   Sun,
   BookOpenCheck,
 } from "lucide-react"
+import { Logo } from "@/components/shared/logo"
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -65,7 +66,7 @@ export function DashboardSidebar({ isCollapsed, onToggle, isMobile }: DashboardS
     <aside
       className={cn(
         "fixed left-0 top-0 z-40 h-screen bg-card border-r border-border transition-all duration-300 flex flex-col",
-        isCollapsed ? "w-[70px]" : "w-64"
+        isCollapsed ? "w-[70px]" : "w-56"
       )}
     >
       {/* Toggle Button (Desktop) */}
@@ -93,14 +94,7 @@ export function DashboardSidebar({ isCollapsed, onToggle, isMobile }: DashboardS
           className="flex items-center gap-2 overflow-hidden"
           onClick={() => isMobile && onToggle()}
         >
-          <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <GraduationCap className="h-5 w-5" />
-          </div>
-          {!isCollapsed && (
-            <span className="text-lg font-bold text-foreground whitespace-nowrap">
-              EduMatrix
-            </span>
-          )}
+          <Logo className={cn("h-10", isCollapsed && "h-8 px-1")} />
         </Link>
       </div>
 
@@ -120,15 +114,18 @@ export function DashboardSidebar({ isCollapsed, onToggle, isMobile }: DashboardS
                 onMouseEnter={() => router.prefetch(item.href)}
                 onClick={() => isMobile && onToggle()}
                 className={cn(
-                  "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
+                  "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all relative group",
                   isActive
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+                    ? "bg-[#FFB00F] text-[#0B0B0B] font-black"
+                    : "text-muted-foreground hover:bg-[#FFB00F]/10 hover:text-[#FFB00F] font-bold",
                   isCollapsed && "justify-center px-2"
                 )}
                 title={isCollapsed ? item.name : undefined}
               >
-                <item.icon className="h-5 w-5 flex-shrink-0" />
+                {isActive && !isCollapsed && (
+                  <span className="absolute left-0 w-1 h-5 bg-[#FF3B30] rounded-r-full" />
+                )}
+                <item.icon className={cn("h-5 w-5 flex-shrink-0", isActive && "group-hover:scale-110 transition-transform")} />
                 {!isCollapsed && <span>{item.name}</span>}
               </Link>
             )
@@ -146,7 +143,7 @@ export function DashboardSidebar({ isCollapsed, onToggle, isMobile }: DashboardS
               href={item.href}
               onClick={() => isMobile && onToggle()}
               className={cn(
-                "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
+                "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
                 isActive
                   ? "bg-primary text-primary-foreground"
                   : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
@@ -164,7 +161,7 @@ export function DashboardSidebar({ isCollapsed, onToggle, isMobile }: DashboardS
         <button
           onClick={toggleTheme}
           className={cn(
-            "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors w-full text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+            "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors w-full text-muted-foreground hover:bg-accent hover:text-accent-foreground",
             isCollapsed && "justify-center px-2"
           )}
         >
@@ -181,7 +178,7 @@ export function DashboardSidebar({ isCollapsed, onToggle, isMobile }: DashboardS
           href="/auth/logout"
           onClick={() => isMobile && onToggle()}
           className={cn(
-            "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors text-destructive hover:bg-destructive/10",
+            "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-bold transition-colors text-[#FF3B30] hover:bg-[#FF3B30]/10",
             isCollapsed && "justify-center px-2"
           )}
           title={isCollapsed ? "Logout" : undefined}
@@ -198,7 +195,7 @@ export function DashboardSidebar({ isCollapsed, onToggle, isMobile }: DashboardS
           )}
         >
           <Avatar className="h-9 w-9">
-            <AvatarImage src={avatarUrl} alt={fullName} />
+            <AvatarImage src={avatarUrl || undefined} alt={fullName} />
             <AvatarFallback className="bg-primary/10 text-primary text-sm font-medium">
               {initials}
             </AvatarFallback>

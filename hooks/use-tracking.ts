@@ -12,15 +12,16 @@ export function useTracking() {
   const pathname = usePathname()
   const sessionStartTime = useRef<number>(Date.now())
   const currentSessionId = useRef<string | null>(null)
+  const isStarting = useRef(false)
 
   // Function to log a specific activity
   const logActivity = async (feature: ActivityFeature, action: ActivityAction, metadata: any = {}) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.user) return
 
       await supabase.from("activity_logs").insert({
-        student_id: user.id,
+        student_id: session.user.id,
         feature,
         action,
         metadata: {
@@ -29,6 +30,18 @@ export function useTracking() {
           timestamp: new Date().toISOString()
         }
       })
+
+      // Also log to the new unified material_views if an ID is present
+      if (metadata.id || metadata.video_id) {
+        let sessionId = sessionStorage.getItem("tensionনাই_session_id")
+        if (sessionId) {
+          await supabase.from("material_views").insert({
+            session_id: sessionId,
+            user_id: session.user.id,
+            material_id: metadata.id || metadata.video_id,
+          })
+        }
+      }
     } catch (error) {
       console.error("Error logging activity:", error)
     }
@@ -36,12 +49,19 @@ export function useTracking() {
 
   // Session tracking logic
   useEffect(() => {
+    if (isStarting.current) return
+    isStarting.current = true
+
     let interval: NodeJS.Timeout
     
     const startSession = async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) return
+        const { data: { session } } = await supabase.auth.getSession()
+        const user = session?.user
+        if (!user) {
+          isStarting.current = false
+          return
+        }
 
         // Create a new usage session
         const { data, error } = await supabase
@@ -71,6 +91,8 @@ export function useTracking() {
         }
       } catch (error) {
         console.error("Error starting usage session:", error)
+      } finally {
+        isStarting.current = false
       }
     }
 
@@ -78,6 +100,7 @@ export function useTracking() {
 
     return () => {
       if (interval) clearInterval(interval)
+      isStarting.current = false
       
       // Final update on unmount
       if (currentSessionId.current) {

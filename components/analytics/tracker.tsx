@@ -17,10 +17,10 @@ export function AnalyticsTracker() {
 
   useEffect(() => {
     // 1. Get or create session ID
-    let sessionId = sessionStorage.getItem("edumatrix_session_id")
+    let sessionId = sessionStorage.getItem("tensionনাই_session_id")
     if (!sessionId) {
       sessionId = generateSessionId()
-      sessionStorage.setItem("edumatrix_session_id", sessionId)
+      sessionStorage.setItem("tensionনাই_session_id", sessionId)
     }
 
     const trackVisit = async () => {
@@ -30,9 +30,21 @@ export function AnalyticsTracker() {
       const { data: { session } } = await supabase.auth.getSession()
       const userId = session?.user?.id || null
 
-      // Insert new visit record for this page load
+      // Upsert Session
+      await supabase
+        .from("sessions")
+        .upsert([
+          {
+            session_id: sessionId,
+            user_id: userId,
+            user_agent: window.navigator.userAgent,
+            last_seen: new Date().toISOString()
+          }
+        ], { onConflict: "session_id" })
+
+      // Insert Page View
       const { data, error } = await supabase
-        .from("website_visits")
+        .from("page_views")
         .insert([
           {
             session_id: sessionId,
@@ -50,14 +62,14 @@ export function AnalyticsTracker() {
 
     trackVisit()
 
-    // Setup ping interval to update last_seen every 60 seconds
+    // Setup ping interval to update last_seen on session
     const pingInterval = setInterval(async () => {
-      if (visitIdRef.current) {
+      if (sessionId) {
         const supabase = createClient()
         await supabase
-          .from("website_visits")
+          .from("sessions")
           .update({ last_seen: new Date().toISOString() })
-          .eq("id", visitIdRef.current)
+          .eq("session_id", sessionId)
       }
     }, 60000)
 

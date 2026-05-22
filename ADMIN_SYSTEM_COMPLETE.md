@@ -1,4 +1,4 @@
-# EduMatrix - Complete Admin System & Dashboard
+# tensionনাই - Complete Admin System & Dashboard
 
 ## ✅ Successfully Implemented
 
@@ -126,7 +126,7 @@ Run the migration script to set up the database:
 
 Required Supabase environment variables (already configured):
 - NEXT_PUBLIC_SUPABASE_URL
-- NEXT_PUBLIC_SUPABASE_ANON_KEY
+- NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
 - SUPABASE_SERVICE_ROLE_KEY
 - POSTGRES_URL
 

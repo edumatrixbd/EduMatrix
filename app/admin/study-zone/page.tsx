@@ -84,7 +84,7 @@ export default function StudyZoneAdminPage() {
 
       {selectedCourse ? (
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="bg-muted/50 p-1 border border-white/5 overflow-x-auto flex-nowrap w-full sm:w-auto">
+          <TabsList className="bg-muted/50 p-1 border border-slate-200 dark:border-white/5 overflow-x-auto flex-nowrap w-full sm:w-auto">
             <TabsTrigger value="playlists" className="gap-2">
               <Play className="w-4 h-4" />
               Playlists
@@ -209,7 +209,7 @@ function PlaylistManager({ courseId }: { courseId: string }) {
         <CardContent className="space-y-2">
           {availableVideos.length === 0 && <p className="text-xs text-muted-foreground">No unassigned videos</p>}
           {availableVideos.map(video => (
-            <div key={video.id} className="p-3 rounded-lg bg-muted/30 border border-white/5 flex flex-col gap-2">
+            <div key={video.id} className="p-3 rounded-lg bg-muted/30 border border-slate-200 dark:border-white/5 flex flex-col gap-2">
               <span className="text-sm font-medium">{video.title}</span>
               <div className="flex gap-2">
                 <Button size="sm" variant="secondary" className="h-7 text-[10px] flex-1" onClick={() => addToPlaylist(video.id, "mid")}>
@@ -224,13 +224,13 @@ function PlaylistManager({ courseId }: { courseId: string }) {
         </CardContent>
       </Card>
 
-      <Card className="border-blue-500/20 bg-blue-500/[0.02]">
+      <Card className="border-primary/20 bg-primary/[0.02]">
         <CardHeader>
-          <CardTitle className="text-sm font-bold text-blue-400 uppercase tracking-wider">Mid Playlist</CardTitle>
+          <CardTitle className="text-sm font-bold text-primary uppercase tracking-wider">Mid Playlist</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
           {midVideos.map(video => (
-            <div key={video.id} className="p-3 rounded-lg bg-blue-500/5 border border-blue-500/10 flex items-center justify-between">
+            <div key={video.id} className="p-3 rounded-lg bg-primary/5 border border-primary/10 flex items-center justify-between">
               <span className="text-sm font-medium">{video.title}</span>
               <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => removeFromPlaylist(video.id, "mid")}>
                 <Trash2 className="w-4 h-4" />
@@ -280,8 +280,8 @@ function ResourceManager({ courseId, type, table }: { courseId: string, type: st
         .select(fields)
         .eq("course_id", courseId)
 
-      setMidItems(data?.filter(i => (i.category === "mid" || i.exam_type === "midterm")) || [])
-      setFinalItems(data?.filter(i => (i.category === "final" || i.exam_type === "final")) || [])
+      setMidItems(data?.filter(i => ((i as any).category === "mid" || (i as any).exam_type === "midterm")) || [])
+      setFinalItems(data?.filter(i => ((i as any).category === "final" || (i as any).exam_type === "final")) || [])
     } catch (error) {
       console.error(`Error fetching ${type}:`, error)
     } finally {
@@ -312,14 +312,14 @@ function ResourceManager({ courseId, type, table }: { courseId: string, type: st
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <Card className="border-blue-500/20 bg-blue-500/[0.02]">
+      <Card className="border-primary/20 bg-primary/[0.02]">
         <CardHeader>
-          <CardTitle className="text-sm font-bold text-blue-400 uppercase tracking-wider">Mid {type}</CardTitle>
+          <CardTitle className="text-sm font-bold text-primary uppercase tracking-wider">Mid {type}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
           {midItems.length === 0 && <p className="text-xs text-muted-foreground p-4 text-center">No Mid items</p>}
           {midItems.map(item => (
-            <div key={item.id} className="p-3 rounded-lg bg-blue-500/5 border border-blue-500/10 flex items-center justify-between group">
+            <div key={item.id} className="p-3 rounded-lg bg-primary/5 border border-primary/10 flex items-center justify-between group">
               <span className="text-sm font-medium">{item.title || item.question_text || "Untitled"}</span>
               <Button size="sm" variant="ghost" className="h-7 text-[10px] opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => switchCategory(item.id, "final")}>
                 Move to Final <MoveRight className="w-3 h-3 ml-1" />

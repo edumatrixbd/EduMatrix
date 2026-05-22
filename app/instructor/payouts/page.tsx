@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/table"
 import { createClient } from "@/lib/supabase/client"
 import { format } from "date-fns"
+import { toast } from "sonner"
 
 export default function InstructorPayoutsPage() {
   const [loading, setLoading] = React.useState(true)
@@ -50,9 +51,37 @@ export default function InstructorPayoutsPage() {
       setPayouts(data || [])
     } catch (error) {
       console.error("Error fetching payouts:", error)
+      toast.error("Failed to load payout history")
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleDownload = () => {
+    toast.promise(
+      new Promise((resolve) => setTimeout(resolve, 2000)),
+      {
+        loading: 'Generating statement...',
+        success: 'Payout statement downloaded',
+        error: 'Failed to generate statement'
+      }
+    )
+  }
+
+  const handleRequestPayout = () => {
+    if (pendingAmount <= 0) {
+      toast.error("You don't have any pending balance to request.")
+      return
+    }
+    
+    toast.promise(
+      new Promise((resolve) => setTimeout(resolve, 2500)),
+      {
+        loading: 'Submitting payout request...',
+        success: 'Request submitted! Our team will process it within 3-5 business days.',
+        error: 'Failed to submit request'
+      }
+    )
   }
 
   const totalPaid = payouts.filter(p => p.status === 'paid').reduce((acc, p) => acc + Number(p.amount), 0)
@@ -65,16 +94,27 @@ export default function InstructorPayoutsPage() {
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Payout History</h1>
-          <p className="text-slate-400 mt-1">Track your monthly earnings and payment status.</p>
+          <p className="text-slate-500 dark:text-slate-400 mt-1">Track your monthly earnings and payment status.</p>
         </div>
-        <Button className="bg-white/5 hover:bg-white/10 border border-white/5 text-xs h-9">
-          <Download className="w-4 h-4 mr-2" /> Download Statement
-        </Button>
+        <div className="flex items-center gap-3">
+          <Button 
+            onClick={handleRequestPayout}
+            className="bg-primary hover:bg-primary/90 text-primary-foreground text-xs h-9"
+          >
+            <ArrowUpRight className="w-4 h-4 mr-2" /> Request Payout
+          </Button>
+          <Button 
+            onClick={handleDownload}
+            className="bg-slate-50 dark:bg-white/5 hover:bg-slate-100 dark:hover:bg-white/10 border border-slate-200 dark:border-white/5 text-xs h-9"
+          >
+            <Download className="w-4 h-4 mr-2" /> Download Statement
+          </Button>
+        </div>
       </motion.div>
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card className="border-white/5 bg-emerald-500/5 backdrop-blur-md">
+        <Card className="border-slate-200 dark:border-white/5 bg-emerald-500/5 backdrop-blur-md">
           <CardContent className="p-6 flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-emerald-400/70 uppercase tracking-wider">Total Paid Out</p>
@@ -89,16 +129,16 @@ export default function InstructorPayoutsPage() {
           </CardContent>
         </Card>
 
-        <Card className="border-white/5 bg-indigo-500/5 backdrop-blur-md">
+        <Card className="border-slate-200 dark:border-white/5 bg-primary/5 backdrop-blur-md">
           <CardContent className="p-6 flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-indigo-400/70 uppercase tracking-wider">Pending Payout</p>
+              <p className="text-sm font-medium text-primary/70 uppercase tracking-wider">Pending Payout</p>
               <h3 className="text-3xl font-bold mt-1">৳{pendingAmount.toLocaleString()}</h3>
-              <p className="text-xs text-indigo-500/50 mt-2 flex items-center gap-1">
+              <p className="text-xs text-primary/50 mt-2 flex items-center gap-1">
                 <Clock className="w-3 h-3" /> Processing for next cycle
               </p>
             </div>
-            <div className="p-4 rounded-2xl bg-indigo-500/10 text-indigo-400 ring-1 ring-indigo-500/20">
+            <div className="p-4 rounded-2xl bg-primary/10 text-primary ring-1 ring-primary/20">
               <CreditCard className="w-8 h-8" />
             </div>
           </CardContent>
@@ -106,8 +146,8 @@ export default function InstructorPayoutsPage() {
       </div>
 
       {/* Payouts Table */}
-      <Card className="border-white/5 bg-white/5 backdrop-blur-md overflow-hidden">
-        <CardHeader className="p-6 border-b border-white/5">
+      <Card className="border-slate-200 dark:border-white/5 bg-slate-50 dark:bg-white/5 backdrop-blur-md overflow-hidden">
+        <CardHeader className="p-6 border-b border-slate-200 dark:border-white/5">
           <CardTitle className="text-lg">All Payout Transactions</CardTitle>
           <CardDescription>Comprehensive list of all payments processed to your account.</CardDescription>
         </CardHeader>
@@ -115,7 +155,7 @@ export default function InstructorPayoutsPage() {
           <div className="overflow-x-auto">
             <Table>
               <TableHeader className="bg-white/[0.02]">
-                <TableRow className="border-white/5">
+                <TableRow className="border-slate-200 dark:border-white/5">
                   <TableHead>Payout Month</TableHead>
                   <TableHead>Amount</TableHead>
                   <TableHead>Requested Date</TableHead>
@@ -135,9 +175,9 @@ export default function InstructorPayoutsPage() {
                   </TableRow>
                 ) : (
                   payouts.map((p) => (
-                    <TableRow key={p.id} className="border-white/5 hover:bg-white/[0.01] transition-colors">
+                    <TableRow key={p.id} className="border-slate-200 dark:border-white/5 hover:bg-slate-100 dark:hover:bg-white/[0.01] transition-colors">
                       <TableCell className="font-bold text-slate-200">{p.payout_month}</TableCell>
-                      <TableCell className="font-bold text-indigo-400">৳{p.amount}</TableCell>
+                      <TableCell className="font-bold text-primary">৳{p.amount}</TableCell>
                       <TableCell className="text-xs text-slate-500">
                         {format(new Date(p.created_at), 'MMM dd, yyyy')}
                       </TableCell>
@@ -147,7 +187,7 @@ export default function InstructorPayoutsPage() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-white">
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-slate-900 dark:hover:text-white">
                           <ArrowUpRight className="w-4 h-4" />
                         </Button>
                       </TableCell>

@@ -17,12 +17,14 @@ import { Bell, Search, Menu, User, Settings, LogOut, ChevronDown, Moon, Sun } fr
 import Link from "next/link"
 import { useTheme } from "@/providers/theme-provider"
 import { useAuth } from "@/hooks/use-auth"
+import { NotificationBell } from "@/components/notification-bell"
 
 interface DashboardHeaderProps {
   onMenuClick: () => void
+  profile?: any
 }
 
-export function DashboardHeader({ onMenuClick }: DashboardHeaderProps) {
+export function DashboardHeader({ onMenuClick, profile }: DashboardHeaderProps) {
   const { theme, toggleTheme } = useTheme()
   const { user, isLoading: authLoading } = useAuth()
   const [searchQuery, setSearchQuery] = useState("")
@@ -32,7 +34,7 @@ export function DashboardHeader({ onMenuClick }: DashboardHeaderProps) {
   const initials = fullName.split(" ").map((n: string) => n[0]).join("").toUpperCase()
 
   return (
-    <header className="sticky top-0 z-30 h-16 bg-white dark:bg-slate-950 backdrop-blur-md border-b border-border flex items-center justify-between px-4 sm:px-6 shadow-sm dark:shadow-none">
+    <header className="sticky top-0 z-30 h-16 bg-white dark:bg-[#0B0B0B] backdrop-blur-md border-b border-border flex items-center justify-between px-4 sm:px-6 shadow-sm dark:shadow-none">
       {/* Left Section */}
       <div className="flex items-center gap-4">
         <Button
@@ -87,29 +89,15 @@ export function DashboardHeader({ onMenuClick }: DashboardHeaderProps) {
         </Button>
 
         {/* Notifications */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="relative">
-              <Bell className="h-5 w-5" />
-              <span className="absolute top-1 right-1 w-2 h-2 bg-primary rounded-full" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-80">
-            <DropdownMenuLabel>Notifications</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <div className="p-4 text-center text-sm text-muted-foreground">
-              <p>No new notifications</p>
-            </div>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <NotificationBell />
 
         {/* User Menu */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="gap-2 px-2">
               <Avatar className="h-8 w-8">
-                <AvatarImage src={avatarUrl} alt={fullName} />
-                <AvatarFallback className="bg-primary/10 text-primary text-sm font-medium">
+                <AvatarImage src={avatarUrl || undefined} alt={fullName} />
+                <AvatarFallback className="bg-[#FFB00F]/10 text-[#FFB00F] text-sm font-black">
                   {initials}
                 </AvatarFallback>
               </Avatar>
@@ -131,7 +119,7 @@ export function DashboardHeader({ onMenuClick }: DashboardHeaderProps) {
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
-              <Link href="/auth/logout" className="flex items-center gap-2 cursor-pointer text-destructive">
+              <Link href="/auth/logout" className="flex items-center gap-2 cursor-pointer text-[#FF3B30] font-bold">
                 <LogOut className="h-4 w-4" />
                 Logout
               </Link>

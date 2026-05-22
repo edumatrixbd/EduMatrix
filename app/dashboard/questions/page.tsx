@@ -1,14 +1,17 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import Link from "next/link"
 import { motion } from "framer-motion"
 import { createClient } from "@/lib/supabase/client"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { FileQuestion, Search, Download, CheckCircle } from "lucide-react"
+import { FileQuestion, Search, Download, CheckCircle, Clock, Lock } from "lucide-react"
 import { Empty, EmptyMedia, EmptyHeader, EmptyTitle, EmptyDescription } from "@/components/ui/empty"
+import { usePaidAccess } from "@/hooks/use-paid-access"
+import { ReportMistakeButton } from "@/components/report-mistake-button"
 
 interface Question {
   id: string
@@ -27,16 +30,24 @@ export default function QuestionsPage() {
   const [questions, setQuestions] = useState<Question[]>([])
   const [searchTerm, setSearchTerm] = useState("")
   const [loading, setLoading] = useState(true)
+  const access = usePaidAccess()
 
   useEffect(() => {
     const fetchQuestions = async () => {
+      if (access.loading) return
+      if (!access.hasAccess) {
+        setQuestions([])
+        setLoading(false)
+        return
+      }
+
       try {
         const supabase = createClient()
         setLoading(true)
         const { data, error } = await supabase
           .from("previous_questions")
-          .select("id, question_text, exam_type, exam_year, question_number, file_url, courses(course_name, course_code)")
-          .order("exam_year", { ascending: false })
+          .select("id, question_text, exam_type, question_number, file_url, courses(course_name, course_code)")
+          .order("question_number", { ascending: true })
           .order("created_at", { ascending: false })
 
         if (error) throw error
@@ -49,7 +60,7 @@ export default function QuestionsPage() {
     }
 
     fetchQuestions()
-  }, [])
+  }, [access.loading, access.hasAccess])
 
   const filteredQuestions = questions.filter((question) => {
     const query = searchTerm.toLowerCase()
@@ -78,6 +89,33 @@ export default function QuestionsPage() {
         </div>
       </motion.div>
 
+      {access.loading || loading && access.hasAccess ? null : !access.hasAccess ? (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.96 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="rounded-2xl border border-dashed p-10 text-center flex flex-col items-center gap-5"
+        >
+          <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
+            {access.isPending ? <Clock className="w-8 h-8 text-primary" /> : <Lock className="w-8 h-8 text-primary" />}
+          </div>
+          <div>
+            <h2 className="text-2xl font-bold text-foreground">
+              {access.isPending ? "Waiting for your payment approval" : "Upgrade your plan"}
+            </h2>
+            <p className="text-muted-foreground max-w-md mt-2">
+              {access.isPending
+                ? "Your payment is waiting for admin approval. Access will unlock after approval."
+                : "You need an active subscription to access previous questions."}
+            </p>
+          </div>
+          {!access.isPending && (
+            <Button asChild>
+              <Link href="/dashboard/billing">Upgrade Your Plan</Link>
+            </Button>
+          )}
+        </motion.div>
+      ) : (
+        <>
       {/* Search */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
@@ -147,7 +185,6 @@ export default function QuestionsPage() {
                 <div className="flex items-center gap-3">
                   <Badge variant="secondary">
                     {q.exam_type ?? "Exam"}
-                    {q.exam_year ? ` ${q.exam_year}` : ""}
                   </Badge>
                   {q.file_url ? (
                     <Button size="sm" variant="ghost" asChild>
@@ -159,12 +196,21 @@ export default function QuestionsPage() {
                   ) : (
                     <Button size="sm" variant="ghost">View</Button>
                   )}
+                  <ReportMistakeButton 
+                    materialType="question"
+                    materialId={q.id}
+                    materialTitle={q.question_text}
+                    variant="ghost"
+                    className="text-muted-foreground hover:text-[#FF3B30] hover:bg-[#FF3B30]/10 ml-2"
+                  />
                 </div>
               </div>
             </CardContent>
           </Card>
         ))}
       </motion.div>
+        </>
+      )}
     </div>
   )
 }

@@ -10,13 +10,15 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Input } from "@/components/ui/input"
-import { Search, ArrowRight, Star, Loader2 } from "lucide-react"
+import { Search, ArrowRight, Star, Loader2, BookOpen } from "lucide-react"
 import Link from "next/link"
 import { PaginationControls } from "@/components/ui/pagination-controls"
 import { swrKeys } from "@/lib/swr/keys"
 import { supabaseFetcher } from "@/lib/swr/fetcher"
 import { useDebounce } from "@/hooks/use-debounce"
 import { Empty, EmptyMedia, EmptyHeader, EmptyTitle, EmptyDescription } from "@/components/ui/empty"
+
+import { useAuth } from "@/hooks/use-auth"
 
 interface Course {
   id: string
@@ -27,9 +29,13 @@ interface Course {
   credits: number | null
   semester: number | null
   status: string | null
+  university: string | null
+  department: string | null
+  batch: string | null
 }
 
 export default function CoursesPage() {
+  const { user } = useAuth()
   const searchParams = useSearchParams()
   const initialSearch = searchParams.get("search") || ""
   
@@ -38,7 +44,7 @@ export default function CoursesPage() {
   const search = useDebounce(searchInput, 400)
 
   const { data, isLoading } = useSWR(
-    swrKeys.courses.list(page, search),
+    swrKeys.courses.list(page, search, user?.university || undefined, user?.department || undefined, user?.batch || undefined),
     supabaseFetcher<Course>,
     { keepPreviousData: true, revalidateOnFocus: false }
   )
@@ -140,18 +146,17 @@ export default function CoursesPage() {
         )}
 
         {courses.map((course) => (
-          <Card key={course.id} className="hover:shadow-lg transition-shadow overflow-hidden">
+          <Card key={course.id} className="bg-white dark:bg-[#0B0B0B]/60 border-black/[0.08] dark:border-[#FFB00F]/10 hover:border-[#FFB00F]/30 shadow-[0_8px_24px_rgba(0,0,0,0.08)] dark:shadow-none transition-all overflow-hidden group">
             <CardHeader className="pb-3">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex-1">
-                  <CardTitle className="line-clamp-2">{course.course_name}</CardTitle>
-                  <CardDescription className="mt-1">
+                  <CardTitle className="line-clamp-2 text-[#111111] dark:text-white font-bold">{course.course_name}</CardTitle>
+                  <CardDescription className="mt-1 text-[#555555] dark:text-white/40">
                     {course.course_code} • Semester {course.semester ?? "N/A"}
                   </CardDescription>
                 </div>
                 <Badge
-                  variant={course.status === "active" ? "default" : "secondary"}
-                  className="shrink-0 capitalize"
+                  className={`${course.status === "active" ? "bg-[#FFB00F] text-[#0B0B0B]" : "bg-black/[0.04] dark:bg-white/5 text-[#555555] dark:text-white/40 border-none"} shrink-0 capitalize font-black text-[10px] uppercase`}
                 >
                   {course.status ?? "draft"}
                 </Badge>
@@ -160,22 +165,22 @@ export default function CoursesPage() {
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Credits</span>
-                  <span className="font-medium">{course.credits ?? 0}</span>
+                  <span className="text-[#555555] dark:text-white/40 font-medium">Credits</span>
+                  <span className="font-black text-[#111111] dark:text-white">{course.credits ?? 0}</span>
                 </div>
-                <Progress value={course.status === "active" ? 100 : 0} className="h-2" />
+                <Progress value={course.status === "active" ? 100 : 0} className="h-1 bg-black/[0.04] dark:bg-white/5" />
               </div>
               <div className="flex items-center justify-between text-sm">
                 <div className="flex items-center gap-1">
-                  <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
-                  <span className="font-medium">Live</span>
+                  <Star className="h-4 w-4 fill-[#FFB00F] text-[#FFB00F]" />
+                  <span className="font-bold text-[#111111] dark:text-white">Live</span>
                 </div>
-                <span className="text-muted-foreground truncate max-w-[140px]">
+                <span className="text-[#555555] dark:text-white/40 truncate max-w-[140px] font-medium">
                   {course.instructor ?? "Instructor TBA"}
                 </span>
               </div>
               <Link href={`/dashboard/course/${course.id}`}>
-                <Button className="w-full" variant="outline">
+                <Button className="w-full bg-[#FFB00F] hover:bg-[#FFB00F]/90 text-[#0B0B0B] font-black rounded-xl" variant="default">
                   View Course
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>

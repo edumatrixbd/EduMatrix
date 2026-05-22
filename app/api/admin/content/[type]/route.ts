@@ -1,13 +1,13 @@
-import { createClient } from "@/lib/supabase/server"
 import { NextRequest, NextResponse } from "next/server"
 import { withRateLimit } from "@/lib/rate-limit"
+import { requireAdmin } from "@/lib/admin/api-auth"
 
-const tables: Record<string, string> = {
-  videos: "video_lectures",
-  questions: "previous_questions",
-  suggestions: "exam_suggestions",
-  notes: "study_notes",
-  solved: "solved_answers",
+const typeMap: Record<string, string> = {
+  videos: "video",
+  questions: "previous_question",
+  suggestions: "suggestion",
+  notes: "note",
+  solved: "solved_answer",
 }
 
 const PAGE_SIZE = 20
@@ -16,14 +16,17 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ type: string }> }
 ) {
-  const limited = withRateLimit(request)
+  const limited = await withRateLimit(request)
   if (limited) return limited
 
-  const supabase = await createClient()
-  const { type } = await params
-  const tableName = tables[type]
+  const auth = await requireAdmin()
+  if (auth.response) return auth.response
 
-  if (!tableName) {
+  const supabase = auth.supabase
+  const { type } = await params
+  const mappedType = typeMap[type]
+
+  if (!mappedType) {
     return NextResponse.json({ error: "Invalid type" }, { status: 400 })
   }
 
@@ -34,8 +37,20 @@ export async function GET(
   const to = from + limit - 1
 
   const { data, error, count } = await supabase
-    .from(tableName)
-    .select("*", { count: "exact" })
+    .from("content_materials")
+    .select(`
+      id,
+      title,
+      description,
+      file_url,
+      created_at,
+      course:course_id(course_name),
+      batch:batch_id(batch_number),
+      department:department_id(name, short_name),
+      university:university_id(name, short_name)
+    `, { count: "exact" })
+    .eq("type", mappedType)
+    .eq("active", true)
     .order("created_at", { ascending: false })
     .range(from, to)
 
@@ -47,7 +62,7 @@ export async function GET(
     { data, count, page, totalPages: Math.ceil((count ?? 0) / limit) },
     {
       headers: {
-        "Cache-Control": "private, max-age=30, stale-while-revalidate=60",
+        "Cache-Control": "no-cache, no-store, must-revalidate",
       },
     }
   )
@@ -57,21 +72,24 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ type: string }> }
 ) {
-  const limited = withRateLimit(request)
+  const limited = await withRateLimit(request)
   if (limited) return limited
 
-  const supabase = await createClient()
+  const auth = await requireAdmin()
+  if (auth.response) return auth.response
+
+  const supabase = auth.supabase
   const { type } = await params
-  const tableName = tables[type]
+  const mappedType = typeMap[type]
   const body = await request.json()
 
-  if (!tableName) {
+  if (!mappedType) {
     return NextResponse.json({ error: "Invalid type" }, { status: 400 })
   }
 
   const { data, error } = await supabase
-    .from(tableName)
-    .insert([body])
+    .from("content_materials")
+    .insert([{ ...body, type: mappedType }])
     .select()
 
   if (error) {

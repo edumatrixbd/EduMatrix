@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { GraduationCap, ShieldCheck, ArrowRight, Loader2, RefreshCw } from "lucide-react"
+import { Logo } from "@/components/shared/logo"
 import { toast } from "sonner"
 
 export default function VerifyPage() {
@@ -25,7 +26,7 @@ function VerifyForm() {
   const searchParams = useSearchParams()
   const supabase = useMemo(() => createClient(), [])
   
-  const email = searchParams.get("email") || ""
+  const email = (searchParams.get("email") || "").toLowerCase()
   const type = searchParams.get("type") || "signup"
   const [otp, setOtp] = useState("")
   const [isLoading, setIsLoading] = useState(false)
@@ -49,16 +50,18 @@ function VerifyForm() {
   const sendOTP = async () => {
     try {
       setIsResending(true)
-      const { error } = await supabase.auth.resend({
+      setError(null)
+      const { data, error } = await supabase.auth.resend({
         type: type as any,
         email: email,
       })
+      console.log("Supabase resend OTP response:", data)
       if (error) throw error
       toast.success("Verification code sent to your email")
       setCountdown(60)
     } catch (err: any) {
       console.error("Error sending OTP:", err)
-      setError(err.message)
+      setError(err?.message || "Failed to send verification code. Please try again.")
     } finally {
       setIsResending(false)
     }
@@ -72,30 +75,105 @@ function VerifyForm() {
     setError(null)
 
     try {
+      const isRecovery = type === "recovery"
+      const isCustomRecovery = type === "custom-recovery"
+      const verifyType = isRecovery ? "email" : type
+
+      if (isCustomRecovery) {
+        const response = await fetch("/api/auth/verify-otp", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, otp }),
+        })
+
+        const data = await response.json()
+        if (!response.ok) throw new Error(data.error || "Verification failed")
+
+        toast.success("Verification successful!")
+        router.push(`/reset-password?email=${encodeURIComponent(email)}`)
+        return
+      }
+
       const { error } = await supabase.auth.verifyOtp({
         email: email,
         token: otp,
-        type: type as any,
+        type: verifyType as any,
       })
 
       if (error) throw error
 
       toast.success("Verification successful!")
       
-      // Check profile status
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('onboarding_completed')
-          .eq('id', user.id)
-          .single()
+      if (isRecovery) {
+        router.push("/reset-password")
+        return
+      }
 
-        if (profile?.onboarding_completed) {
-          router.push("/dashboard")
-        } else {
-          router.push("/onboarding/university")
+      // Get the now-verified user
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        router.push("/login")
+        return
+      }
+
+      // ... existing student/signup logic ...
+      const pendingPassword = sessionStorage.getItem('pending_signup_password')
+      const pendingEmail = sessionStorage.getItem('pending_signup_email')
+
+      if (pendingPassword && pendingEmail?.toLowerCase() === user.email?.toLowerCase()) {
+        const { error: pwError } = await supabase.auth.updateUser({ password: pendingPassword })
+        if (pwError) {
+          console.warn("Password set failed (non-fatal):", pwError.message)
         }
+        // Clear immediately — never leave password in storage
+        sessionStorage.removeItem('pending_signup_password')
+        sessionStorage.removeItem('pending_signup_email')
+      }
+
+      // Upsert student_profiles — ensures profile exists even if DB trigger was delayed
+      await supabase.from('student_profiles').upsert({
+        id: user.id,
+        full_name: user.user_metadata?.full_name || null,
+        phone_number: user.user_metadata?.phone_number || null,
+      }, { onConflict: 'id', ignoreDuplicates: false })
+
+      // Also ensure core profiles row exists with correct role
+      await supabase.from('profiles').upsert({
+        id: user.id,
+        email: user.email,
+        role: 'student',
+        full_name: user.user_metadata?.full_name || null,
+      }, { onConflict: 'id', ignoreDuplicates: false })
+
+      // Fetch profile to determine role and onboarding status
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role, onboarding_completed, university_id, department_id, batch_id')
+        .eq('id', user.id)
+        .single()
+      
+      const role = profile?.role?.toLowerCase()
+
+      if (role === 'instructor') {
+        router.push("/instructor")
+        return
+      }
+
+      if (role === 'admin' || role === 'superadmin' || role === 'super_admin') {
+        router.push("/admin")
+        return
+      }
+
+      // Only redirect new signups to onboarding
+      const isSignup = type === 'signup' || type === 'email'
+      console.log("VERIFY_OTP_TYPE:", type, "isSignup:", isSignup)
+
+      if (isSignup) {
+        console.log("NEW_SIGNUP: Routing to institutional onboarding.")
+        router.replace("/onboarding/university")
+      } else {
+        console.log("EXISTING_USER_LOGIN: Routing to dashboard.")
+        router.replace("/dashboard")
       }
     } catch (err: any) {
       console.error("Verification error:", err)
@@ -114,9 +192,7 @@ function VerifyForm() {
         className="w-full max-w-md"
       >
         <div className="flex justify-center mb-8">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-lg shadow-primary/20">
-            <GraduationCap className="h-7 w-7" />
-          </div>
+          <Logo className="h-12" />
         </div>
 
         <Card className="border-border/50 shadow-premium">

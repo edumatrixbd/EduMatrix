@@ -14,12 +14,12 @@ const inter = Inter({
 })
 
 export const metadata: Metadata = {
-  title: 'EduMatrix - Ace Your Exams',
+  title: 'tensionনাই - Ace Your Exams',
   description: 'The ultimate exam preparation platform for university students. Access videos, previous questions, suggestions, notes, and solved answers.',
-  keywords: ['EduMatrix', 'university', 'exam preparation', 'study materials', 'previous questions'],
-  authors: [{ name: 'EduMatrix Team' }],
+  keywords: ['tensionনাই', 'university', 'exam preparation', 'study materials', 'previous questions'],
+  authors: [{ name: 'tensionনাই Team' }],
   openGraph: {
-    title: 'EduMatrix - Ace Your Exams',
+    title: 'tensionনাই - Ace Your Exams',
     description: 'The ultimate exam preparation platform for university students',
     type: 'website',
   },
@@ -43,6 +43,7 @@ export default function RootLayout({
       data-scroll-behavior="smooth"
       suppressHydrationWarning
     >
+      <head />
       <body className="font-sans antialiased" suppressHydrationWarning>
         <ThemeProvider>
           {children}

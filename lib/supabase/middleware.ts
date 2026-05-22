@@ -1,6 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
-import { getAdminEmails, getLocalAdminConfig, getSupabaseConfig } from './config'
+import { getSupabaseConfig, getLocalAdminConfig } from './config'
 
 function redirectWithCookies(request: NextRequest, response: NextResponse, pathname: string) {
   const url = request.nextUrl.clone()
@@ -23,10 +23,12 @@ export async function updateSession(request: NextRequest) {
   const pathname = request.nextUrl.pathname
   const isDashboardRoute = pathname === '/dashboard' || pathname.startsWith('/dashboard/')
   const isAdminRoute = pathname === '/admin' || pathname.startsWith('/admin/')
-  const isProtectedRoute = (isDashboardRoute || isAdminRoute) && pathname !== '/login' && pathname !== '/admin/login'
+  const isInstructorRoute = pathname === '/instructor' || pathname.startsWith('/instructor/')
+  const isOnboardingRoute = pathname === '/onboarding' || pathname.startsWith('/onboarding/')
+  const isVerifyRoute = pathname === '/verify-otp'
 
   if (!isConfigured) {
-    if (isProtectedRoute || pathname === '/login' || pathname === '/admin/login') {
+    if ((isDashboardRoute || isAdminRoute || isInstructorRoute) || pathname === '/login' || pathname === '/admin/login' || pathname === '/instructor/login') {
       const url = request.nextUrl.clone()
       url.pathname = '/supabase-setup'
       url.searchParams.set('next', pathname)
@@ -36,8 +38,6 @@ export async function updateSession(request: NextRequest) {
     return supabaseResponse
   }
 
-  // With Fluid compute, don't put this client in a global environment
-  // variable. Always create a new one on each request.
   const supabase = createServerClient(
     url!,
     anonKey!,
@@ -61,10 +61,6 @@ export async function updateSession(request: NextRequest) {
     },
   )
 
-  // Do not run code between createServerClient and
-  // supabase.auth.getUser(). A simple mistake could make it very hard to debug
-  // issues with users being randomly logged out.
-
   let user = null
   try {
     const {
@@ -75,63 +71,119 @@ export async function updateSession(request: NextRequest) {
     console.error('Middleware: Error getting user:', e)
   }
 
-  const role = user?.app_metadata?.role ?? user?.user_metadata?.role ?? 'student'
-  const adminEmails = getAdminEmails()
-  const localAdmin = getLocalAdminConfig()
-  const hasLocalAdminSession =
-    Boolean(localAdmin.sessionSecret) &&
-    request.cookies.get(localAdmin.cookieName)?.value === localAdmin.sessionSecret
-  const isAdmin =
-    hasLocalAdminSession ||
-    role === 'admin' ||
-    Boolean(user?.email && adminEmails.includes(user.email.toLowerCase()))
-  const isStudent = role === 'student' || !isAdmin
+  const isLoginOrAuthPath = 
+    pathname === '/login' || 
+    pathname === '/admin/login' || 
+    pathname === '/instructor/login' || 
+    pathname.startsWith('/auth/') || 
+    pathname === '/pending-approval' ||
+    pathname === '/auth/pending';
 
-  if (isProtectedRoute && !user && !hasLocalAdminSession) {
+  const isProtectedRoute = (isDashboardRoute || isAdminRoute || isInstructorRoute || isOnboardingRoute) && 
+                           !isLoginOrAuthPath && 
+                           pathname !== '/instructor/apply' && 
+                           !isVerifyRoute;
+
+  // 1. Unauthenticated direct URL access prevention
+  if (isProtectedRoute && !user) {
+    let loginPath = '/login'
+    if (pathname.startsWith('/instructor')) loginPath = '/instructor/login'
+    else if (pathname.startsWith('/admin')) loginPath = '/admin/login'
+    
     const url = request.nextUrl.clone()
-    url.pathname = isAdminRoute ? '/admin/login' : '/login'
+    url.pathname = loginPath
     url.searchParams.set('redirectedFrom', pathname)
 
     const redirectResponse = NextResponse.redirect(url)
     supabaseResponse.cookies.getAll().forEach((cookie) => {
       redirectResponse.cookies.set(cookie)
     })
-
     return redirectResponse
   }
 
-  if (user && isAdminRoute && !isAdmin) {
-    return redirectWithCookies(request, supabaseResponse, '/dashboard')
-  }
+  // 2. Authenticated user state evaluation & multi-tier guards
+  if (user) {
+    // Check profiles table first
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role, status, approved, is_active')
+      .eq('id', user.id)
+      .single()
 
-  if (user && isDashboardRoute && !isStudent) {
-    return redirectWithCookies(request, supabaseResponse, '/admin')
-  }
+    // Rule 1: If no profile: redirect /auth/pending
+    if (!profile) {
+      if (!isLoginOrAuthPath && pathname !== '/auth/pending') {
+        return redirectWithCookies(request, supabaseResponse, '/auth/pending')
+      }
+      return supabaseResponse
+    }
 
-  if (pathname === '/login' && user) {
-    return redirectWithCookies(request, supabaseResponse, isAdmin ? '/admin' : '/dashboard')
-  }
+    const role = profile.role || 'student'
+    const status = profile.status || 'pending'
+    const approved = profile.approved === true
+    const isActive = profile.is_active !== false
 
-  if ((pathname === '/login' || pathname === '/admin/login') && hasLocalAdminSession) {
-    return redirectWithCookies(request, supabaseResponse, '/admin')
-  }
+    // Rule 3: If is_active = false OR status = 'suspended': logout user and show "Account suspended"
+    if (!isActive || status === 'suspended') {
+      const url = request.nextUrl.clone()
+      url.pathname = '/login'
+      url.searchParams.set('error', 'suspended')
+      
+      const redirectResponse = NextResponse.redirect(url)
+      // Clear cookies to destroy browser session completely
+      supabaseResponse.cookies.getAll().forEach((cookie) => {
+        redirectResponse.cookies.set({ ...cookie, maxAge: 0 })
+      })
 
-  if (pathname === '/admin/login' && user) {
-    return redirectWithCookies(request, supabaseResponse, isAdmin ? '/admin' : '/dashboard')
-  }
+      try {
+        await supabase.auth.signOut({ scope: 'global' })
+      } catch (err) {
+        console.error("SignOut in middleware error:", err)
+      }
 
-  // IMPORTANT: You *must* return the supabaseResponse object as it is.
-  // If you're creating a new response object with NextResponse.next() make sure to:
-  // 1. Pass the request in it, like so:
-  //    const myNewResponse = NextResponse.next({ request })
-  // 2. Copy over the cookies, like so:
-  //    myNewResponse.cookies.setAll(supabaseResponse.cookies.getAll())
-  // 3. Change the myNewResponse object to fit your needs, but avoid changing
-  //    the cookies!
-  // 4. Finally:
-  //    return myNewResponse
-  // If this is not done, you may be causing the browser and server to go out
-  // of sync and terminate the user's session prematurely!
+      return redirectResponse
+    }
+
+    // Rule 2: If approved = false OR status = 'pending': redirect /pending-approval
+    if (!approved || status === 'pending') {
+      if (!isLoginOrAuthPath && pathname !== '/pending-approval') {
+        return redirectWithCookies(request, supabaseResponse, '/pending-approval')
+      }
+      // If they are on a login path, let them pass so they can sign out if needed, but block standard views
+      if (isProtectedRoute) {
+        return redirectWithCookies(request, supabaseResponse, '/pending-approval')
+      }
+      return supabaseResponse
+    }
+
+    // Rule 4 & 5: Only approved active users can enter panel. Direct URL access guards.
+    const userRole = role.toLowerCase()
+    const isSuperAdmin = userRole === 'super_admin' || userRole === 'superadmin'
+    const isAdmin = userRole === 'admin' || isSuperAdmin
+
+    if (isAdminRoute && !isAdmin) {
+      // Direct URL entry block for admin routes
+      return redirectWithCookies(request, supabaseResponse, userRole === 'instructor' ? '/instructor' : '/dashboard')
+    }
+
+    if (isInstructorRoute && userRole !== 'instructor') {
+      // Direct URL entry block for instructor routes
+      return redirectWithCookies(request, supabaseResponse, isAdmin ? '/admin' : '/dashboard')
+    }
+
+    if (isDashboardRoute && (isAdmin || userRole === 'instructor')) {
+      // Direct URL entry block for dashboard routes
+      return redirectWithCookies(request, supabaseResponse, isAdmin ? '/admin' : '/instructor')
+    }
+
+    // Prevent authenticated approved users from accessing login screens again
+    if (pathname === '/login' || pathname === '/admin/login' || pathname === '/instructor/login') {
+      let dest = '/dashboard'
+      if (userRole === 'instructor') dest = '/instructor'
+      if (isAdmin) dest = '/admin'
+      return redirectWithCookies(request, supabaseResponse, dest)
+    }
+  }
 
   return supabaseResponse
 }

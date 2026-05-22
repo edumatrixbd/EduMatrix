@@ -88,136 +88,142 @@ export default function AdminInstructorsPage() {
     i.name?.toLowerCase().includes(search.toLowerCase())
   )
 
-  if (loading) return <div className="flex items-center justify-center min-h-[400px]"><Loader2 className="animate-spin" /></div>
-
   return (
     <div className="space-y-8">
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">Instructors</h1>
-          <p className="text-muted-foreground mt-1">Manage course instructors and revenue sharing agreements.</p>
+      {loading ? (
+        <div className="flex items-center justify-center min-h-[400px]">
+          <Loader2 className="animate-spin h-8 w-8 text-primary" />
         </div>
-        <Button className="gap-2 bg-primary hover:bg-primary/90">
-          <UserPlus className="w-4 h-4" /> Add Instructor
-        </Button>
-      </motion.div>
-
-      {/* Main Table Card */}
-      <Card className="border-white/5 bg-card/50 backdrop-blur-sm overflow-hidden">
-        <CardHeader className="p-6 pb-4 border-b border-white/5">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <CardTitle className="text-lg">Instructor Roster</CardTitle>
-            <div className="flex items-center gap-2">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input 
-                  placeholder="Search by name..." 
-                  className="pl-9 w-64 bg-muted/30 border-white/10"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                />
-              </div>
-              <Button variant="outline" size="icon" className="border-white/10">
-                <Filter className="w-4 h-4" />
-              </Button>
+      ) : (
+        <>
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-foreground">Instructors</h1>
+              <p className="text-muted-foreground mt-1">Manage course instructors and revenue sharing agreements.</p>
             </div>
-          </div>
-        </CardHeader>
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader className="bg-muted/30">
-                <TableRow className="border-white/5 hover:bg-transparent">
-                  <TableHead className="w-[300px]">Instructor</TableHead>
-                  <TableHead>Assigned Courses</TableHead>
-                  <TableHead>Total Earnings</TableHead>
-                  <TableHead>Expertise</TableHead>
-                  <TableHead>Joined Date</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredInstructors.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
-                      No instructors found.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filteredInstructors.map((inst) => (
-                    <TableRow key={inst.id} className="border-white/5 hover:bg-white/[0.02] transition-colors">
-                      <TableCell>
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary font-bold">
-                            {inst.name?.[0]}
-                          </div>
-                          <div className="flex flex-col min-w-0">
-                            <span className="text-sm font-semibold text-foreground truncate">{inst.name}</span>
-                            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                              <Mail className="w-3 h-3" />
-                              <span className="truncate">instructor@example.com</span>
-                            </div>
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <BookOpen className="w-3.5 h-3.5 text-blue-400" />
-                          <span className="text-sm font-medium">{inst.courseCount} Courses</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <DollarSign className="w-3.5 h-3.5 text-emerald-400" />
-                          <span className="text-sm font-bold text-emerald-400">৳{inst.totalEarnings.toLocaleString()}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-1">
-                          {inst.expertise?.slice(0, 2).map((tag: string) => (
-                            <Badge key={tag} variant="secondary" className="text-[10px] bg-white/5 text-white/70">
-                              {tag}
-                            </Badge>
-                          ))}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">
-                        {inst.created_at ? new Date(inst.created_at).toLocaleDateString() : 'N/A'}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8">
-                              <MoreHorizontal className="w-4 h-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-48 bg-slate-900 border-white/10">
-                            <DropdownMenuLabel>Instructor Actions</DropdownMenuLabel>
-                            <DropdownMenuSeparator className="bg-white/5" />
-                            <DropdownMenuItem className="cursor-pointer">
-                              <Edit className="w-4 h-4 mr-2" /> Edit Details
-                            </DropdownMenuItem>
-                            <DropdownMenuItem className="cursor-pointer text-blue-400">
-                              <BookOpen className="w-4 h-4 mr-2" /> Manage Courses
-                            </DropdownMenuItem>
-                            <DropdownMenuItem className="cursor-pointer text-emerald-400">
-                              <Percent className="w-4 h-4 mr-2" /> Adjust Shares
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator className="bg-white/5" />
-                            <DropdownMenuItem className="cursor-pointer text-red-400">
-                              <Trash2 className="w-4 h-4 mr-2" /> Remove
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
+            <Button className="gap-2 bg-primary hover:bg-primary/90">
+              <UserPlus className="w-4 h-4" /> Add Instructor
+            </Button>
+          </motion.div>
+
+          {/* Main Table Card */}
+          <Card className="border-slate-200 dark:border-white/5 bg-white/50 dark:bg-card/50 backdrop-blur-sm overflow-hidden">
+            <CardHeader className="p-6 pb-4 border-b border-slate-200 dark:border-white/5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <CardTitle className="text-lg">Instructor Roster</CardTitle>
+                <div className="flex items-center gap-2">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input 
+                      placeholder="Search by name..." 
+                      className="pl-9 w-64 bg-muted/30 border-slate-200 dark:border-white/10"
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                    />
+                  </div>
+                  <Button variant="outline" size="icon" className="border-slate-200 dark:border-white/10">
+                    <Filter className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader className="bg-muted/30">
+                    <TableRow className="border-slate-200 dark:border-white/5 hover:bg-transparent">
+                      <TableHead className="w-[300px]">Instructor</TableHead>
+                      <TableHead>Assigned Courses</TableHead>
+                      <TableHead>Total Earnings</TableHead>
+                      <TableHead>Expertise</TableHead>
+                      <TableHead>Joined Date</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredInstructors.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
+                          No instructors found.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      filteredInstructors.map((inst) => (
+                        <TableRow key={inst.id} className="border-slate-200 dark:border-white/5 hover:bg-slate-100 dark:hover:bg-white/[0.01] transition-colors">
+                          <TableCell>
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary font-bold">
+                                {inst.name?.[0]}
+                              </div>
+                              <div className="flex flex-col min-w-0">
+                                <span className="text-sm font-semibold text-foreground truncate">{inst.name}</span>
+                                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                  <Mail className="w-3 h-3" />
+                                  <span className="truncate">instructor@example.com</span>
+                                </div>
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <BookOpen className="w-3.5 h-3.5 text-primary" />
+                              <span className="text-sm font-medium">{inst.courseCount} Courses</span>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <DollarSign className="w-3.5 h-3.5 text-emerald-400" />
+                              <span className="text-sm font-bold text-emerald-400">৳{inst.totalEarnings.toLocaleString()}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex flex-wrap gap-1">
+                              {inst.expertise?.slice(0, 2).map((tag: string) => (
+                                <Badge key={tag} variant="secondary" className="text-[10px] bg-slate-50 dark:bg-white/5 text-white/70">
+                                  {tag}
+                                </Badge>
+                              ))}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-xs text-muted-foreground">
+                            {inst.created_at ? new Date(inst.created_at).toLocaleDateString() : 'N/A'}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-8 w-8">
+                                  <MoreHorizontal className="w-4 h-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-48 bg-white dark:bg-slate-900 border-slate-200 dark:border-white/10">
+                                <DropdownMenuLabel>Instructor Actions</DropdownMenuLabel>
+                                <DropdownMenuSeparator className="bg-slate-50 dark:bg-white/5" />
+                                <DropdownMenuItem className="cursor-pointer">
+                                  <Edit className="w-4 h-4 mr-2" /> Edit Details
+                                </DropdownMenuItem>
+                                <DropdownMenuItem className="cursor-pointer text-primary">
+                                  <BookOpen className="w-4 h-4 mr-2" /> Manage Courses
+                                </DropdownMenuItem>
+                                <DropdownMenuItem className="cursor-pointer text-emerald-400">
+                                  <Percent className="w-4 h-4 mr-2" /> Adjust Shares
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator className="bg-slate-50 dark:bg-white/5" />
+                                <DropdownMenuItem className="cursor-pointer text-red-400">
+                                  <Trash2 className="w-4 h-4 mr-2" /> Remove
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </>
+      )}
     </div>
   )
 }

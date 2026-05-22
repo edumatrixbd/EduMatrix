@@ -27,6 +27,8 @@ import {
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
+import { logAdminActivity } from "@/lib/activity-logger"
+import { PermissionGuard } from "@/components/admin/permission-guard"
 
 export default function AdminSettingsPage() {
   const [loading, setLoading] = useState(true)
@@ -82,6 +84,10 @@ export default function AdminSettingsPage() {
         .eq("id", settings.id)
 
       if (error) throw error
+      await logAdminActivity("UPDATE_SETTINGS", "settings", settings.id || null, { 
+        maintenance_mode: settings.maintenance_mode,
+        seo_title: settings.seo_title 
+      })
       toast.success("Settings updated successfully")
     } catch (error) {
       console.error("Error saving settings:", error)
@@ -100,7 +106,8 @@ export default function AdminSettingsPage() {
   }
 
   return (
-    <div className="space-y-8">
+    <PermissionGuard permission="settings_manage">
+      <div className="space-y-8">
       <motion.div 
         initial={{ opacity: 0, y: 20 }} 
         animate={{ opacity: 1, y: 0 }}
@@ -305,7 +312,8 @@ export default function AdminSettingsPage() {
           </CardContent>
         </Card>
       </div>
-    </div>
+      </div>
+    </PermissionGuard>
   )
 }
 

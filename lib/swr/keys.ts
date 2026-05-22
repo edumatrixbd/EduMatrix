@@ -7,29 +7,37 @@ const PAGE_SIZE = 12
 
 export const swrKeys = {
   courses: {
-    list: (page: number, search: string) =>
-      JSON.stringify({
+    list: (page: number, search: string, university_id?: string, department_id?: string, batch_id?: string) => {
+      const filters = []
+      if (university_id) filters.push({ column: "university_id", op: "eq", value: university_id })
+      if (department_id) filters.push({ column: "department_id", op: "eq", value: department_id })
+      if (batch_id) filters.push({ column: "batch_id", op: "eq", value: batch_id })
+
+      return JSON.stringify({
         table: "courses",
-        select: "id, course_code, course_name, instructor, semester, status",
+        select: "id, course_code, course_name, instructor, semester, status, university_id, department_id, batch_id",
         search: search
           ? { query: search, fields: ["course_name", "course_code"] }
           : undefined,
+        filters,
         orderBy: [
           { column: "semester", ascending: true },
           { column: "course_code", ascending: true },
         ],
         page,
         pageSize: PAGE_SIZE,
-      }),
+      })
+    },
   },
 
   notes: {
     list: (page: number, search: string) =>
       JSON.stringify({
-        table: "study_notes",
-        select: "id, title, topic, courses(course_name, course_code)",
+        table: "content_materials",
+        select: "id, title, type, file_url, courses(course_name, course_code)",
+        filters: [{ column: "type", op: "eq", value: "note" }],
         search: search
-          ? { query: search, fields: ["title", "content", "topic"] }
+          ? { query: search, fields: ["title"] }
           : undefined,
         orderBy: [{ column: "created_at", ascending: false }],
         page,
@@ -38,29 +46,34 @@ export const swrKeys = {
   },
 
   videos: {
-    list: (page: number, search: string) =>
-      JSON.stringify({
-        table: "video_lectures",
-        select: "id, title, duration, courses(course_name, course_code)",
+    list: (page: number, search: string, university_id?: string, department_id?: string, batch_id?: string) => {
+      const filters: any[] = [{ column: "type", op: "eq", value: "video" }]
+      if (batch_id) filters.push({ column: "batch_id", op: "eq", value: batch_id })
+
+      return JSON.stringify({
+        table: "content_materials",
+        select: "id, title, type, file_url, courses(id, course_name, course_code)",
+        filters,
         search: search
-          ? { query: search, fields: ["title", "description"] }
+          ? { query: search, fields: ["title"] }
           : undefined,
         orderBy: [{ column: "created_at", ascending: false }],
         page,
         pageSize: PAGE_SIZE,
-      }),
+      })
+    },
   },
 
   questions: {
     list: (page: number, search: string) =>
       JSON.stringify({
-        table: "previous_questions",
-        select: "id, question_text, exam_type, exam_year, question_number, file_url, courses(course_name, course_code)",
+        table: "content_materials",
+        select: "id, title, type, file_url, courses(course_name, course_code)",
+        filters: [{ column: "type", op: "eq", value: "previous_question" }],
         search: search
-          ? { query: search, fields: ["question_text", "exam_type"] }
+          ? { query: search, fields: ["title"] }
           : undefined,
         orderBy: [
-          { column: "exam_year", ascending: false },
           { column: "created_at", ascending: false },
         ],
         page,
@@ -71,10 +84,11 @@ export const swrKeys = {
   solved: {
     list: (page: number, search: string) =>
       JSON.stringify({
-        table: "solved_answers",
-        select: "id, title, content, file_url, difficulty, courses(course_name, course_code)",
+        table: "content_materials",
+        select: "id, title, type, file_url, courses(course_name, course_code)",
+        filters: [{ column: "type", op: "eq", value: "solved_answer" }],
         search: search
-          ? { query: search, fields: ["title", "content"] }
+          ? { query: search, fields: ["title"] }
           : undefined,
         orderBy: [{ column: "created_at", ascending: false }],
         page,
@@ -83,15 +97,21 @@ export const swrKeys = {
   },
 
   dashboard: {
-    stats: () =>
+    stats: (university_id?: string, department_id?: string, batch_id?: string) =>
       JSON.stringify({
         table: "dashboard_stats",
         type: "multi_count",
+        university_id,
+        department_id,
+        batch_id
       }),
-    recentUploads: () =>
+    recentUploads: (university_id?: string, department_id?: string, batch_id?: string) =>
       JSON.stringify({
         table: "dashboard_recent",
         type: "multi_union",
+        university_id,
+        department_id,
+        batch_id
       })
   }
 }

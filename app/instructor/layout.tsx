@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import React, { useState } from "react"
 import dynamic from "next/dynamic"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -14,11 +14,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Search, Menu, User, LogOut, ChevronDown, CreditCard } from "lucide-react"
+import { Search, Menu, User, LogOut, ChevronDown, CreditCard, Loader2, Moon, Sun } from "lucide-react"
+import { ThemeToggle } from "@/components/shared/theme-toggle"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
+import { NotificationBell } from "@/components/notification-bell"
 
 const InstructorSidebar = dynamic(
   () => import("@/components/instructor/sidebar").then((mod) => mod.InstructorSidebar),
@@ -32,7 +34,7 @@ export default function InstructorLayout({
 }) {
   const router = useRouter()
   const pathname = usePathname()
-  const isLoginPage = pathname === "/instructor/login"
+  const isLoginPage = pathname === "/instructor/login" || pathname === "/instructor/apply"
   const [isCollapsed, setIsCollapsed] = useState(false)
   const [isMobileOpen, setIsMobileOpen] = useState(false)
 
@@ -43,7 +45,49 @@ export default function InstructorLayout({
     router.refresh()
   }
 
+  // Auth & Role Protection
+  const { createClient: createBrowserClient } = require("@/lib/supabase/client")
+  const [authChecked, setAuthChecked] = useState(false)
+
+  React.useEffect(() => {
+    const checkAuth = async () => {
+      if (isLoginPage) {
+        setAuthChecked(true)
+        return
+      }
+
+      const supabase = createBrowserClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      
+      if (!user) {
+        router.push("/instructor/login")
+        return
+      }
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single()
+
+      if (profile?.role === 'student') {
+        router.push("/dashboard")
+        return
+      }
+
+      if (!['instructor', 'admin', 'super_admin', 'superadmin'].includes(profile?.role || '')) {
+        router.push("/instructor/login")
+        return
+      }
+
+      setAuthChecked(true)
+    }
+
+    checkAuth()
+  }, [isLoginPage, router])
+
   if (isLoginPage) return <>{children}</>
+  if (!authChecked) return <div className="min-h-screen bg-white dark:bg-slate-950 flex items-center justify-center transition-colors duration-300"><Loader2 className="animate-spin text-primary h-8 w-8" /></div>
 
   return (
     <div className="min-h-screen bg-white dark:bg-slate-950 transition-colors duration-300">
@@ -110,11 +154,15 @@ export default function InstructorLayout({
               <Search className="h-5 w-5" />
             </Button>
 
+            <ThemeToggle />
+
+            <NotificationBell />
+
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="gap-2 px-2">
                   <Avatar className="h-8 w-8">
-                    <AvatarFallback className="bg-indigo-500/10 text-indigo-600 text-sm font-bold">
+                    <AvatarFallback className="bg-primary/10 text-primary text-sm font-bold">
                       IN
                     </AvatarFallback>
                   </Avatar>

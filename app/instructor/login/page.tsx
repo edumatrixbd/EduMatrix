@@ -11,10 +11,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { ArrowRight, Eye, EyeOff, GraduationCap, Lock, Mail } from "lucide-react"
+import { Logo } from "@/components/shared/logo"
 
 export default function InstructorLoginPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-slate-950" />}>
+    <Suspense fallback={<div className="min-h-screen bg-white dark:bg-slate-950" />}>
       <InstructorLoginForm />
     </Suspense>
   )
@@ -24,6 +25,8 @@ function InstructorLoginForm() {
   const router = useRouter()
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [isResetMode, setIsResetMode] = useState(false)
+  const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -37,23 +40,111 @@ function InstructorLoginForm() {
 
     try {
       const supabase = createClient()
+
+      if (isResetMode) {
+        const response = await fetch("/api/auth/send-otp", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email }),
+        })
+
+        const data = await response.json()
+        if (!response.ok || data.success === false) {
+          const errMsg = data.error || "Failed to send OTP"
+          console.error("OTP Generation Error:", data)
+          throw new Error(errMsg)
+        }
+
+        setMessage("Verification code sent to your email. Redirecting to verify...")
+        router.push(`/verify-otp?email=${encodeURIComponent(email)}&type=custom-recovery`)
+        return
+      }
+
       const { data: { user }, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
 
       if (error) throw error
+      const { data: currentUserData } = await supabase.auth.getUser()
+      const isEmailVerified = Boolean(user?.email_confirmed_at) && Boolean(currentUserData.user?.email_confirmed_at)
+      if (!isEmailVerified) {
+        await supabase.auth.signOut()
+        throw new Error("Please verify your email before logging in")
+      }
 
       const { data: profile } = await supabase
         .from('profiles')
-        .select('role')
+        .select('role, status, approved, is_active')
         .eq('id', user?.id)
         .single()
 
-      if (profile?.role !== "instructor") {
-        await supabase.auth.signOut()
-        throw new Error("Access denied. You are not registered as an instructor.")
+      // Rule 1: If no profile: redirect /auth/pending
+      if (!profile) {
+        router.push("/auth/pending")
+        return
       }
+
+      const role = profile.role || 'student'
+      const status = profile.status || 'pending'
+      const approved = profile.approved === true
+      const isActive = profile.is_active !== false
+
+      // Rule 3: If is_active = false OR status = 'suspended': logout user and show "Account suspended"
+      if (!isActive || status === 'suspended') {
+        await supabase.auth.signOut()
+        throw new Error("Account suspended")
+      }
+
+      // Rule 2: If approved = false OR status = 'pending': redirect /pending-approval
+      if (!approved || status === 'pending') {
+        router.push("/pending-approval")
+        return
+      }
+
+      const userRole = role.toLowerCase()
+      const isSuperAdmin = userRole === 'super_admin' || userRole === 'superadmin'
+      const isAdmin = userRole === 'admin' || isSuperAdmin
+
+      // Redirect strictly by role
+      if (isAdmin) {
+        router.push("/admin")
+        router.refresh()
+      } else if (userRole === 'instructor') {
+        router.push("/instructor")
+        router.refresh()
+      } else if (userRole === 'student') {
+        router.push("/student")
+        router.refresh()
+      } else {
+        await supabase.auth.signOut()
+        throw new Error("Access denied. Invalid account role.")
+      }
+
+      // If not an instructor yet, check application status
+      const { data: latestApp } = await supabase
+        .from('instructor_applications')
+        .select('status')
+        .eq('email', email)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      console.log("Instructor Login - Latest Application Status:", latestApp?.status)
+
+      if (latestApp?.status === "pending") {
+        await supabase.auth.signOut()
+        throw new Error("Your instructor application is still under review.")
+      }
+
+      if (latestApp?.status === "rejected") {
+        await supabase.auth.signOut()
+        throw new Error("Your instructor application was not approved.")
+      }
+
+      // Default fallback
+      await supabase.auth.signOut()
+      throw new Error("Access denied. You are not registered as an instructor.")
 
       router.push("/instructor")
       router.refresh()
@@ -65,24 +156,23 @@ function InstructorLoginForm() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-6 bg-slate-950">
+    <div className="min-h-screen flex items-center justify-center p-6 bg-white dark:bg-slate-950 transition-colors duration-300">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         className="w-full max-w-md"
       >
         <div className="text-center mb-8">
-          <div className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-lg shadow-indigo-600/20 mb-4">
-            <GraduationCap className="h-7 w-7" />
+          <div className="flex justify-center mb-4">
+            <Logo className="h-12" />
           </div>
-          <h1 className="text-2xl font-bold text-white">EduMatrix</h1>
-          <p className="text-slate-400 mt-2">Instructor Partner Portal</p>
+          <p className="text-slate-500 dark:text-slate-400 mt-2">Instructor Partner Portal</p>
         </div>
 
-        <Card className="border-white/10 bg-slate-900 shadow-2xl">
+        <Card className="border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 shadow-2xl">
           <CardHeader>
-            <CardTitle className="text-white">Instructor Login</CardTitle>
-            <CardDescription className="text-slate-400">Enter your professional account details</CardDescription>
+            <CardTitle className="text-slate-900 dark:text-white">Instructor Login</CardTitle>
+            <CardDescription className="text-slate-500 dark:text-slate-400">Enter your professional account details</CardDescription>
           </CardHeader>
           <CardContent>
             {error && (
@@ -91,58 +181,97 @@ function InstructorLoginForm() {
               </Alert>
             )}
 
+            {message && (
+              <Alert className="mb-6 bg-primary/10 border-primary/20 text-primary">
+                <AlertDescription>{message}</AlertDescription>
+              </Alert>
+            )}
+
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="email" className="text-slate-300">Email Address</Label>
+                <Label htmlFor="email" className="text-slate-700 dark:text-slate-300">Email Address</Label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
                   <Input
                     id="email"
                     name="email"
                     type="email"
-                    placeholder="instructor@edumatrix.com"
-                    className="h-11 pl-10 bg-slate-800 border-white/10 text-white focus:border-indigo-500/50"
+                    placeholder="instructor@tensionনাই.com"
+                    className="h-11 pl-10 bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-white/10 text-slate-900 dark:text-white focus:border-primary/50"
                     required
                   />
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="password" title="password" className="text-slate-300">Password</Label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
-                  <Input
-                    id="password"
-                    name="password"
-                    type={showPassword ? "text" : "password"}
-                    placeholder="••••••••"
-                    className="h-11 pl-10 pr-10 bg-slate-800 border-white/10 text-white focus:border-indigo-500/50"
-                    required
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
-                  >
-                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </button>
+              {!isResetMode && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="password" title="password" className="text-slate-700 dark:text-slate-300">Password</Label>
+                    <button
+                      type="button"
+                      onClick={() => setIsResetMode(true)}
+                      className="text-xs text-primary hover:underline"
+                    >
+                      Forgot password?
+                    </button>
+                  </div>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+                    <Input
+                      id="password"
+                      name="password"
+                      type={showPassword ? "text" : "password"}
+                      placeholder="••••••••"
+                      className="h-11 pl-10 pr-10 bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-white/10 text-slate-900 dark:text-white focus:border-primary/50"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-900 dark:hover:text-white"
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
                 </div>
-              </div>
+              )}
 
-              <Button type="submit" className="w-full h-11 bg-indigo-600 hover:bg-indigo-700 text-white font-bold" disabled={isLoading}>
+              <Button type="submit" className="w-full h-11 bg-primary hover:bg-primary/90 text-white font-bold" disabled={isLoading}>
                 {isLoading ? (
                   <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                 ) : (
                   <>
-                    Sign In to Portal
+                    {isResetMode ? "Send Verification Code" : "Sign In to Portal"}
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </>
                 )}
               </Button>
+
+              {isResetMode && (
+                <button
+                  type="button"
+                  onClick={() => setIsResetMode(false)}
+                  className="w-full text-center text-sm text-slate-500 hover:text-slate-900 dark:hover:text-white mt-4"
+                >
+                  Back to Login
+                </button>
+              )}
+
+              <div className="text-center pt-2">
+                <p className="text-sm text-slate-500">
+                  Want to teach on tensionনাই?{" "}
+                  <Link 
+                    href="/instructor/apply" 
+                    className="text-[#FFB00F] font-semibold hover:underline"
+                  >
+                    Become an Instructor
+                  </Link>
+                </p>
+              </div>
             </form>
 
-            <div className="mt-8 text-center border-t border-white/5 pt-6">
-              <Link href="/login" className="text-sm text-slate-500 hover:text-indigo-400">
+            <div className="mt-8 text-center border-t border-slate-200 dark:border-white/5 pt-6">
+              <Link href="/login" className="text-sm text-slate-500 hover:text-primary">
                 Switch to Student Access
               </Link>
             </div>

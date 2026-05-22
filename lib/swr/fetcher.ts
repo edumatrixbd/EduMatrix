@@ -13,7 +13,13 @@ export type PaginatedResult<T> = {
  */
 export async function supabaseFetcher<T>(key: string): Promise<any> {
   const supabase = createClient()
-  const parsed = JSON.parse(key) as any
+  let parsed: any;
+  try {
+    parsed = typeof key === 'string' ? JSON.parse(key) : key;
+  } catch (e) {
+    console.error("Failed to parse supabaseFetcher key:", key);
+    return { data: [], count: 0, page: 0, totalPages: 0 };
+  }
 
   // Add a 15-second timeout to prevent infinite loading
   const controller = new AbortController()
@@ -24,7 +30,11 @@ export async function supabaseFetcher<T>(key: string): Promise<any> {
   try {
     // Optimized Dashboard Stats via RPC
     if (table === "dashboard_stats" && type === "multi_count") {
-      const { data, error } = await supabase.rpc('get_dashboard_stats')
+      const { data, error } = await supabase.rpc('get_dashboard_stats', {
+        p_university_id: parsed.university_id,
+        p_department_id: parsed.department_id,
+        p_batch_id: parsed.batch_id
+      })
       clearTimeout(timeoutId)
       if (error) throw new Error(error.message)
       return data
@@ -32,7 +42,12 @@ export async function supabaseFetcher<T>(key: string): Promise<any> {
 
     // Optimized Dashboard Recent Activity via RPC
     if (table === "dashboard_recent" && type === "multi_union") {
-      const { data, error } = await supabase.rpc('get_recent_activity', { limit_val: 5 })
+      const { data, error } = await supabase.rpc('get_recent_activity', { 
+        limit_val: 5,
+        p_university_id: parsed.university_id,
+        p_department_id: parsed.department_id,
+        p_batch_id: parsed.batch_id
+      })
       clearTimeout(timeoutId)
       if (error) throw new Error(error.message)
       return data || []
@@ -49,7 +64,7 @@ export async function supabaseFetcher<T>(key: string): Promise<any> {
 
     if (search && search.query && search.fields.length > 0) {
       const orQuery = search.fields
-        .map((field) => `${field}.ilike.%${search.query}%`)
+        .map((field: string) => `${field}.ilike.%${search.query}%`)
         .join(",")
       query = (query as any).or(orQuery)
     }
@@ -90,4 +105,14 @@ export async function supabaseFetcher<T>(key: string): Promise<any> {
 /**
  * Simple JSON fetcher for /api/* routes.
  */
-export const apiFetcher = (url: string) => fetch(url).then((r) => r.json())
+export const apiFetcher = async (url: string) => {
+  const r = await fetch(url)
+  const text = await r.text()
+  if (!text) return {}
+  try {
+    return JSON.parse(text)
+  } catch (e) {
+    console.error("apiFetcher JSON parse error for URL:", url, "Text:", text)
+    return {}
+  }
+}

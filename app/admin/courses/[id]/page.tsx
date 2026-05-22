@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { createClient } from "@/lib/supabase/client"
 
 export default function EditCoursePage() {
   const router = useRouter()
@@ -18,11 +19,13 @@ export default function EditCoursePage() {
   const id = params.id as string
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [instructors, setInstructors] = useState<any[]>([])
   const [formData, setFormData] = useState({
     course_code: "",
     course_name: "",
     description: "",
     instructor: "",
+    instructor_id: "",
     credits: "3",
     semester: "1",
     price: "0",
@@ -30,23 +33,31 @@ export default function EditCoursePage() {
   })
 
   useEffect(() => {
-    const fetchCourse = async () => {
-      const response = await fetch(`/api/admin/courses/${id}`)
-      const data = await response.json()
-      setFormData({
-        course_code: data.course_code ?? "",
-        course_name: data.course_name ?? "",
-        description: data.description ?? "",
-        instructor: data.instructor ?? "",
-        credits: String(data.credits ?? 3),
-        semester: String(data.semester ?? 1),
-        price: String(data.price ?? 0),
-        status: data.status ?? "active",
-      })
+    const fetchStaticData = async () => {
+      const supabase = createClient()
+      const [courseRes, instructorRes] = await Promise.all([
+        fetch(`/api/admin/courses/${id}`).then(res => res.json()),
+        supabase.from('profiles').select('id, full_name').eq('role', 'instructor')
+      ])
+
+      if (courseRes) {
+        setFormData({
+          course_code: courseRes.course_code ?? "",
+          course_name: courseRes.course_name ?? "",
+          description: courseRes.description ?? "",
+          instructor: courseRes.instructor ?? "",
+          instructor_id: courseRes.instructor_id ?? "",
+          credits: String(courseRes.credits ?? 3),
+          semester: String(courseRes.semester ?? 1),
+          price: String(courseRes.price ?? 0),
+          status: courseRes.status ?? "active",
+        })
+      }
+      if (instructorRes.data) setInstructors(instructorRes.data)
       setLoading(false)
     }
 
-    fetchCourse()
+    fetchStaticData()
   }, [id])
 
   const handleChange = (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -55,23 +66,32 @@ export default function EditCoursePage() {
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
+    if (!formData.instructor_id) {
+      alert("Please select an instructor")
+      return
+    }
     setSaving(true)
-    await fetch(`/api/admin/courses/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        ...formData,
-        credits: parseInt(formData.credits),
-        semester: parseInt(formData.semester),
-        price: parseFloat(formData.price),
-      }),
-    })
-    setSaving(false)
-    router.push("/admin/courses")
+    try {
+      await fetch(`/api/admin/courses/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...formData,
+          credits: parseInt(formData.credits),
+          semester: parseInt(formData.semester),
+          price: parseFloat(formData.price),
+        }),
+      })
+      router.push("/admin/courses")
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setSaving(false)
+    }
   }
 
   if (loading) {
-    return <Card><CardContent className="p-8 text-center text-muted-foreground">Loading course...</CardContent></Card>
+    return <Card><CardContent className="p-8 text-center text-muted-foreground">Loading course details...</CardContent></Card>
   }
 
   return (
@@ -82,7 +102,7 @@ export default function EditCoursePage() {
         </Link>
         <div>
           <h1 className="text-2xl font-bold">Edit Course</h1>
-          <p className="text-muted-foreground">Update course details</p>
+          <p className="text-muted-foreground">Update course details and assignment</p>
         </div>
       </motion.div>
 
@@ -105,8 +125,22 @@ export default function EditCoursePage() {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="instructor">Instructor</Label>
-                <Input id="instructor" name="instructor" value={formData.instructor} onChange={handleChange} required />
+                <Label htmlFor="instructor">Instructor *</Label>
+                <Select 
+                  value={formData.instructor_id} 
+                  onValueChange={(v) => setFormData(prev => ({ ...prev, instructor_id: v }))}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select Instructor" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {instructors.map(inst => (
+                      <SelectItem key={inst.id} value={inst.id}>
+                        {inst.full_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="price">Price (৳)</Label>

@@ -37,10 +37,10 @@ const DashboardChart = dynamic(
 )
 
 const quickLinks = [
-  { icon: Video, label: "Video Lectures", href: "/dashboard/videos", color: "from-blue-500 via-indigo-500 to-purple-500" },
-  { icon: FileQuestion, label: "Previous Questions", href: "/dashboard/questions", color: "from-purple-500 via-fuchsia-500 to-pink-500" },
-  { icon: Lightbulb, label: "Exam Suggestions", href: "/dashboard/suggestions", color: "from-pink-500 via-rose-500 to-orange-500" },
-  { icon: BookOpen, label: "Study Notes", href: "/dashboard/notes", color: "from-emerald-400 via-teal-500 to-cyan-500" },
+  { icon: Video, label: "Video Lectures", href: "/dashboard/videos" },
+  { icon: FileQuestion, label: "Previous Questions", href: "/dashboard/questions" },
+  { icon: Lightbulb, label: "Exam Suggestions", href: "/dashboard/suggestions" },
+  { icon: BookOpen, label: "Study Notes", href: "/dashboard/notes" },
 ]
 
 
@@ -58,28 +58,44 @@ interface DashboardCounts {
 }
 
 export default function DashboardPage() {
+  const router = useRouter()
   const { user: profile, isLoading: authLoading } = useAuth()
   const [courses, setCourses] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const { toast } = useToast()
 
+  // Redirect instructors to instructor panel
+  useEffect(() => {
+    if (!authLoading && profile?.role === 'instructor') {
+      router.push("/instructor")
+    }
+  }, [profile, authLoading, router])
+
   // SWR for Stats
-  const { data: countsData } = useSWR(swrKeys.dashboard.stats(), supabaseFetcher, {
-    revalidateOnFocus: false,
-    refreshInterval: 60000 // Refresh every minute
-  })
+  const { data: countsData } = useSWR(
+    profile ? swrKeys.dashboard.stats(profile.university_id, profile.department_id, profile.batch_id) : null, 
+    supabaseFetcher, 
+    {
+      revalidateOnFocus: false,
+      refreshInterval: 60000 // Refresh every minute
+    }
+  )
 
   // SWR for Recent Uploads
-  const { data: recentUploadsRaw } = useSWR(swrKeys.dashboard.recentUploads(), supabaseFetcher, {
-    revalidateOnFocus: false
-  })
+  const { data: recentUploadsRaw } = useSWR(
+    profile ? swrKeys.dashboard.recentUploads(profile.university_id, profile.department_id, profile.batch_id) : null, 
+    supabaseFetcher, 
+    {
+      revalidateOnFocus: false
+    }
+  )
 
   useEffect(() => {
     // Check for welcome flag
     const searchParams = new URLSearchParams(window.location.search)
     if (searchParams.get("welcome") === "true") {
       toast({
-        title: "Welcome to EduMatrix! 🎉",
+        title: "Welcome to tensionনাই! 🎉",
         description: "Your email has been successfully verified.",
         duration: 5000,
       })
@@ -96,6 +112,9 @@ export default function DashboardPage() {
           .from('courses')
           .select('id, semester')
           .eq('status', 'active')
+          .eq('university_id', profile?.university_id || '')
+          .eq('department_id', profile?.department_id || '')
+          .eq('batch_id', profile?.batch_id || '')
         
         if (coursesRes) {
           setCourses(coursesRes)
@@ -157,20 +176,6 @@ export default function DashboardPage() {
     })
   }, [recentUploadsRaw])
 
-  const semesters = Array.from({ length: 8 }, (_, index) => {
-    const id = index + 1
-    const semesterCourses = courses.filter((course) => course.semester === id).length
-    const status = semesterCourses > 0 ? "current" : "upcoming"
-
-    return {
-      id,
-      name: `Semester ${id}`,
-      courses: semesterCourses,
-      progress: semesterCourses > 0 ? 25 : 0,
-      status,
-    }
-  })
-
   const stats = [
     { label: "Courses", value: loading ? "..." : String(counts.courses), icon: BookOpen },
     { label: "Questions", value: loading ? "..." : String(counts.questions), icon: Target },
@@ -188,10 +193,19 @@ export default function DashboardPage() {
         className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"
       >
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Welcome back!</h1>
-          <p className="text-muted-foreground mt-1">Continue your exam preparation</p>
+          <h1 className="text-3xl font-black text-foreground tracking-tight">Welcome back!</h1>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-sm font-bold text-muted-foreground">
+            <span className="flex items-center gap-1.5">
+              <BookOpen className="w-4 h-4 text-primary" />
+              {profile?.university || "No University"}
+            </span>
+            <span className="w-1 h-1 bg-muted-foreground/30 rounded-full" />
+            <span>{profile?.department || "No Department"}</span>
+            <span className="w-1 h-1 bg-muted-foreground/30 rounded-full" />
+            <span className="text-primary">Batch {profile?.batch || "N/A"}</span>
+          </div>
         </div>
-        <Badge className="w-fit bg-primary/10 text-primary border-primary/20 px-3 py-1">
+        <Badge className="w-fit bg-primary/10 text-primary border-primary/20 px-3 py-1 font-black">
           <Calendar className="w-3.5 h-3.5 mr-1.5" />
           Semester {profile?.semester || "N/A"}
         </Badge>
@@ -207,11 +221,13 @@ export default function DashboardPage() {
         {quickLinks.map((link) => (
           <Link key={link.label} href={link.href} className="block h-full">
             <TiltCard maxTilt={10} scale={1.05} glare={true} className="h-full">
-              <div className={`relative h-full group overflow-hidden rounded-lg p-6 text-white cursor-pointer transition-all hover:shadow-premium hover:shadow-${link.color.split('-')[1]}-500/50 bg-gradient-to-br ${link.color}`}>
-                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
+              <div className="relative h-full group overflow-hidden rounded-2xl p-6 text-white cursor-pointer transition-all bg-[#0B0B0B] border border-white/5 hover:border-[#FFB00F]/50 hover:shadow-[0_8px_24px_rgba(0,0,0,0.15)] dark:hover:shadow-[0_0_20px_-5px_rgba(255,176,15,0.4)]">
+                <div className="absolute inset-0 bg-gradient-to-br from-[#FFB00F]/10 via-transparent to-[#FF3B30]/5 opacity-30 group-hover:opacity-50 transition-opacity" />
                 <div className="relative z-10">
-                  <link.icon className="w-6 h-6 mb-3 drop-shadow-md" />
-                  <p className="font-semibold text-sm drop-shadow-md">{link.label}</p>
+                  <div className="w-12 h-12 rounded-xl bg-[#FFB00F]/10 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+                    <link.icon className="w-6 h-6 text-[#FFB00F]" />
+                  </div>
+                  <p className="font-bold text-sm text-white drop-shadow-sm">{link.label}</p>
                 </div>
               </div>
             </TiltCard>
@@ -227,15 +243,15 @@ export default function DashboardPage() {
         className="grid grid-cols-2 md:grid-cols-4 gap-4"
       >
         {stats.map((stat) => (
-          <Card key={stat.label} className="hover:shadow-md transition-shadow">
+          <Card key={stat.label} className="bg-white dark:bg-[#0B0B0B]/60 border-black/[0.08] dark:border-[#FFB00F]/10 hover:border-[#FFB00F]/30 shadow-[0_8px_24px_rgba(0,0,0,0.08)] dark:shadow-none transition-all group">
             <CardContent className="p-4 sm:p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">{stat.label}</p>
-                  <p className="text-2xl font-bold text-foreground mt-1">{stat.value}</p>
+                  <p className="text-sm text-[#555555] dark:text-white/50 font-medium">{stat.label}</p>
+                  <p className="text-2xl font-black text-[#111111] dark:text-white mt-1">{stat.value}</p>
                 </div>
-                <div className="p-3 bg-primary/10 rounded-lg">
-                  <stat.icon className="w-5 h-5 text-primary" />
+                <div className="p-3 bg-[#FFB00F]/10 rounded-xl group-hover:scale-110 transition-transform">
+                  <stat.icon className="w-5 h-5 text-[#FFB00F]" />
                 </div>
               </div>
             </CardContent>
@@ -260,54 +276,11 @@ export default function DashboardPage() {
         </Card>
       </motion.div>
 
-      {/* Semesters Section */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.2 }}
-      >
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <CardTitle>All Semesters</CardTitle>
-              <CardDescription>Track your progress across all semesters</CardDescription>
-            </div>
-            <Link href="/dashboard/courses">
-              <Button variant="ghost" size="sm" className="text-primary">
-                View All
-                <ArrowRight className="w-4 h-4 ml-1" />
-              </Button>
-            </Link>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {semesters.map((semester) => (
-                <Link key={semester.id} href={`/dashboard/semester/${semester.id}`}>
-                  <div className="p-4 rounded-lg border border-border/50 bg-card/50 hover:border-primary/50 hover:shadow-[0_0_15px_-3px_rgba(139,92,246,0.2)] transition-all cursor-pointer">
-                    <div className="flex items-center justify-between mb-3">
-                      <h3 className="font-semibold text-foreground text-sm">{semester.name}</h3>
-                      {semester.status === "current" && (
-                        <Badge className="bg-primary text-primary-foreground text-xs">Current</Badge>
-                      )}
-                      {semester.status === "upcoming" && (
-                        <Badge variant="secondary" className="text-xs">Empty</Badge>
-                      )}
-                    </div>
-                    <p className="text-xs text-muted-foreground mb-3">{semester.courses} Courses</p>
-                    <Progress value={semester.progress} className="h-1.5" />
-                  </div>
-                </Link>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </motion.div>
-
       {/* Recent Uploads Feed */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.25 }}
+        transition={{ duration: 0.5, delay: 0.2 }}
       >
         <Card>
           <CardHeader>
@@ -344,16 +317,10 @@ export default function DashboardPage() {
                recentUploadsData.map((upload, index) => (
                 <div
                   key={index}
-                  className="flex items-center gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors"
+                  className="flex items-center gap-3 p-3 rounded-lg hover:bg-black/[0.04] dark:hover:bg-white/5 transition-colors"
                 >
                   <div
-                    className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                      upload.type === "video"
-                        ? "bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
-                        : upload.type === "question"
-                        ? "bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400"
-                        : "bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400"
-                    }`}
+                    className="w-10 h-10 rounded-lg flex items-center justify-center bg-[#FFB00F]/10 text-[#FFB00F]"
                   >
                     {upload.type === "video" ? (
                       <Video className="w-5 h-5" />
@@ -364,12 +331,12 @@ export default function DashboardPage() {
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium text-foreground truncate">{upload.title}</p>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="font-bold text-[#111111] dark:text-white truncate">{upload.title}</p>
+                    <p className="text-xs text-[#555555] dark:text-white/40">
                       {upload.course} • {upload.time}
                     </p>
                   </div>
-                  <Badge variant="outline" className="capitalize">
+                  <Badge variant="outline" className="capitalize text-[10px] border-black/10 dark:border-white/10 text-[#555555] dark:text-white/40">
                     {upload.type}
                   </Badge>
                 </div>

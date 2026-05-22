@@ -39,7 +39,7 @@ export default function AdminProfilePage() {
           </div>
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
-            <Input id="email" defaultValue="admin@edumatrix.com" />
+            <Input id="email" defaultValue="admin@tensionনাই.com" />
           </div>
           <div className="space-y-2">
             <Label htmlFor="role">Role</Label>

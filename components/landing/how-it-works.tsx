@@ -1,91 +1,64 @@
 "use client"
 
 import { motion } from "framer-motion"
-import { UserPlus, BookOpen, Target, Award } from "lucide-react"
+import { PlayCircle, GraduationCap, Target } from "lucide-react"
 
 const steps = [
   {
-    icon: UserPlus,
-    step: "01",
-    title: "Create Your Account",
-    description: "Sign up in seconds with your DIU email and get instant access to the platform.",
+    title: "Watch",
+    description: "Learn complex topics through crystal-clear video lectures.",
+    icon: PlayCircle,
+    color: "bg-blue-500"
   },
   {
-    icon: BookOpen,
-    step: "02",
-    title: "Choose Your Semester",
-    description: "Select your current semester and explore all available courses and materials.",
-  },
-  {
+    title: "Practice",
+    description: "Solve years of previous questions with step-by-step guides.",
     icon: Target,
-    step: "03",
-    title: "Access Resources",
-    description: "Dive into videos, notes, previous questions, and suggestions for each course.",
+    color: "bg-purple-500"
   },
   {
-    icon: Award,
-    step: "04",
-    title: "Ace Your Exams",
-    description: "Study smarter, track your progress, and achieve your academic goals.",
-  },
+    title: "Prepare",
+    description: "Ace your exams with targeted suggestions and quick-notes.",
+    icon: GraduationCap,
+    color: "bg-emerald-500"
+  }
 ]
 
 export function HowItWorks() {
   return (
-    <section id="how-it-works" className="py-20 sm:py-28 bg-muted/30">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        {/* Section Header */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.5 }}
-          className="text-center max-w-3xl mx-auto"
-        >
-          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-foreground text-balance">
-            Get started in{" "}
-            <span className="gradient-text">4 simple steps</span>
+    <section className="py-24 relative z-10 overflow-hidden">
+      <div className="max-w-7xl mx-auto px-6">
+        <div className="text-center mb-16">
+          <h2 className="text-4xl md:text-6xl font-black text-slate-900 mb-6">
+            How it works
           </h2>
-          <p className="mt-4 text-lg text-muted-foreground text-pretty">
-            From sign-up to success, we have made the journey as simple as possible
+          <p className="text-xl text-slate-800 font-medium max-w-2xl mx-auto">
+            A simple 3-step process to transform your exam preparation from chaotic to confident.
           </p>
-        </motion.div>
+        </div>
 
-        {/* Steps */}
-        <div className="mt-16 relative">
-          {/* Connection line */}
-          <div className="hidden lg:block absolute top-24 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-border to-transparent" />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-12 relative">
+          {/* Connector Line (Desktop) */}
+          <div className="hidden md:block absolute top-1/2 left-0 w-full h-0.5 bg-slate-200 -z-10" />
           
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-            {steps.map((step, index) => (
-              <motion.div
-                key={step.step}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.5, delay: index * 0.15 }}
-                className="relative text-center"
-              >
-                {/* Step Number */}
-                <div className="relative inline-flex">
-                  <div className="w-16 h-16 rounded-2xl bg-card border-2 border-border flex items-center justify-center shadow-premium relative z-10">
-                    <step.icon className="w-7 h-7 text-primary" />
-                  </div>
-                  <div className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center shadow-md">
-                    {index + 1}
-                  </div>
-                </div>
-
-                {/* Content */}
-                <h3 className="mt-6 text-xl font-semibold text-foreground">
-                  {step.title}
-                </h3>
-                <p className="mt-2 text-muted-foreground leading-relaxed">
-                  {step.description}
-                </p>
-              </motion.div>
-            ))}
-          </div>
+          {steps.map((step, index) => (
+            <motion.div
+              key={index}
+              initial={{ opacity: 0, y: 30 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6, delay: index * 0.2 }}
+              className="flex flex-col items-center text-center group"
+            >
+              <div className={`w-20 h-20 rounded-3xl ${step.color} flex items-center justify-center text-white shadow-2xl mb-8 transform group-hover:scale-110 transition-transform duration-300`}>
+                <step.icon className="w-10 h-10" />
+              </div>
+              <h3 className="text-2xl font-black text-slate-900 mb-4">{step.title}</h3>
+              <p className="text-slate-700 leading-relaxed max-w-[250px]">
+                {step.description}
+              </p>
+            </motion.div>
+          ))}
         </div>
       </div>
     </section>

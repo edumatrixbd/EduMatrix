@@ -6,6 +6,6 @@ export function createClient() {
 
   return createBrowserClient(
     url,
-    anonKey,
+    anonKey
   )
 }

@@ -62,27 +62,26 @@ const plans = [
 
 export function Pricing() {
   return (
-    <section id="pricing" className="py-20 sm:py-28">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+    <section id="pricing" className="py-24 relative z-10">
+      <div className="mx-auto max-w-7xl px-6">
         {/* Section Header */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.5 }}
-          className="text-center max-w-3xl mx-auto"
+          className="text-center max-w-3xl mx-auto mb-16"
         >
-          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-foreground text-balance">
-            Simple,{" "}
-            <span className="gradient-text">affordable pricing</span>
+          <h2 className="text-4xl md:text-6xl font-black text-slate-900 leading-tight">
+            Simple pricing.
           </h2>
-          <p className="mt-4 text-lg text-muted-foreground text-pretty">
-            Choose the plan that fits your needs. All plans include core study materials.
+          <p className="mt-6 text-xl text-slate-800 font-medium">
+            Choose the plan that fits your needs. No hidden fees.
           </p>
         </motion.div>
 
         {/* Pricing Cards */}
-        <div className="mt-16 grid grid-cols-1 md:grid-cols-3 gap-8 items-start">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-start">
           {plans.map((plan, index) => (
             <motion.div
               key={plan.name}
@@ -94,56 +93,52 @@ export function Pricing() {
             >
               {plan.popular && (
                 <div className="absolute -top-4 left-0 right-0 flex justify-center z-10">
-                  <Badge className="bg-gradient-premium text-white border-none shadow-lg px-4 py-1">
-                    <Sparkles className="w-3.5 h-3.5 mr-1.5" />
+                  <Badge className="bg-slate-900 text-yellow-400 border-none shadow-lg px-4 py-1 font-black uppercase tracking-widest text-[10px]">
+                    <Sparkles className="w-3 h-3 mr-1.5" />
                     Most Popular
                   </Badge>
                 </div>
               )}
               
-              <TiltCard maxTilt={5} scale={1.02} glare={false} className={`h-full ${plan.popular ? "border-gradient-wrapper shadow-premium-lg scale-105" : ""}`}>
-                <Card className={`h-full ${plan.popular ? "border-gradient-content border-none" : "hover:shadow-premium"} transition-all duration-300`}>
-                  <CardHeader className="text-center pb-4">
-                    <CardTitle className="text-2xl font-bold">{plan.name}</CardTitle>
-                    <CardDescription className="text-muted-foreground">
-                      {plan.description}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    {/* Price */}
-                    <div className="text-center">
-                      <div className="flex items-baseline justify-center gap-1">
-                        <span className="text-lg text-muted-foreground">৳</span>
-                        <span className="text-5xl font-bold text-foreground">{plan.price}</span>
-                      </div>
-                      <p className="text-sm text-muted-foreground mt-1">{plan.period}</p>
+              <Card className={`h-full rounded-[2.5rem] border-none p-8 ${plan.popular ? "bg-white shadow-2xl scale-105" : "bg-white/50 backdrop-blur-sm shadow-xl"} transition-all duration-300 hover:scale-[1.02]`}>
+                <CardHeader className="text-center pb-6">
+                  <CardTitle className="text-3xl font-black text-slate-900">{plan.name}</CardTitle>
+                  <CardDescription className="text-slate-600 font-bold">
+                    {plan.description}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-8">
+                  {/* Price */}
+                  <div className="text-center">
+                    <div className="flex items-baseline justify-center gap-1">
+                      <span className="text-2xl font-black text-slate-400">৳</span>
+                      <span className="text-6xl font-black text-slate-900 tracking-tighter">{plan.price}</span>
                     </div>
+                    <p className="text-sm text-slate-500 font-bold uppercase tracking-wider mt-2">{plan.period}</p>
+                  </div>
 
-                    {/* Features */}
-                    <ul className="space-y-3">
-                      {plan.features.map((feature) => (
-                        <li key={feature} className="flex items-start gap-3">
-                          <div className="mt-0.5 flex-shrink-0 w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center">
-                            <Check className="w-3 h-3 text-primary" />
-                          </div>
-                          <span className="text-sm text-muted-foreground">{feature}</span>
-                        </li>
-                      ))}
-                    </ul>
+                  {/* Features */}
+                  <ul className="space-y-4">
+                    {plan.features.map((feature) => (
+                      <li key={feature} className="flex items-start gap-3">
+                        <div className="mt-1 flex-shrink-0 w-5 h-5 rounded-full bg-slate-900 flex items-center justify-center">
+                          <Check className="w-3 h-3 text-yellow-400" />
+                        </div>
+                        <span className="text-sm text-slate-700 font-bold">{feature}</span>
+                      </li>
+                    ))}
+                  </ul>
 
-                    {/* CTA */}
-                    <Link href="/login" className="block">
-                      <Button
-                        className={`w-full ${plan.popular ? 'bg-gradient-premium hover:bg-gradient-premium-hover glow-premium-hover border-none text-white' : ''}`}
-                        variant={plan.popular ? "default" : "outline"}
-                        size="lg"
-                      >
-                        {plan.cta}
-                      </Button>
-                    </Link>
-                  </CardContent>
-                </Card>
-              </TiltCard>
+                  {/* CTA */}
+                  <Link href="/login" className="block pt-4">
+                    <Button
+                      className={`w-full h-14 rounded-2xl text-lg font-black transition-all ${plan.popular ? 'bg-slate-900 hover:bg-slate-800 text-white shadow-xl shadow-slate-900/20' : 'bg-transparent border-4 border-slate-900 text-slate-900 hover:bg-slate-900 hover:text-white'}`}
+                    >
+                      {plan.cta}
+                    </Button>
+                  </Link>
+                </CardContent>
+              </Card>
             </motion.div>
           ))}
         </div>

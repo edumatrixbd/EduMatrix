@@ -1,4 +1,4 @@
-# EduMatrix - All Pages Built Successfully
+# tensionনাই - All Pages Built Successfully
 
 ## Build Summary
 All 13 pages compiled successfully with Next.js 16.2.4 (Turbopack).

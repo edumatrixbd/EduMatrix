@@ -17,15 +17,12 @@ import {
 import { BookOpen, Users, Loader2, ArrowLeft, Check, Sparkles } from "lucide-react"
 
 const departments = [
-  { id: "cse", name: "Computer Science and Engineering" },
-  { id: "swe", name: "Software Engineering" },
-  { id: "eee", name: "Electrical and Electronics Engineering" },
-  { id: "bba", name: "Business Administration" },
+  { id: "cse", name: "Computer Science and Engineering (CSE)" },
 ]
 
-const batches = Array.from({ length: 15 }, (_, i) => ({
-  id: String(65 - i),
-  name: `Batch ${65 - i}`
+const batches = [68, 69, 70, 71, 72].map(b => ({
+  id: String(b),
+  name: `Batch ${b}`
 }))
 
 export default function DetailsOnboarding() {
@@ -35,8 +32,7 @@ export default function DetailsOnboarding() {
   const [user, setUser] = useState<any>(null)
   const [formData, setFormData] = useState({
     department: "",
-    batch: "",
-    semester: ""
+    batch: ""
   })
 
   useEffect(() => {
@@ -52,24 +48,19 @@ export default function DetailsOnboarding() {
   }, [])
 
   const handleComplete = async () => {
-    if (!formData.department || !formData.batch || !formData.semester || !user) return
+    if (!formData.department || !formData.batch || !user) return
     setLoading(true)
     try {
       const { error } = await supabase
-        .from('profiles')
+        .from('student_profiles')
         .update({
           department: formData.department,
           batch: formData.batch,
-          semester: parseInt(formData.semester),
           onboarding_completed: true
         })
         .eq('id', user.id)
 
       if (error) throw error
-
-      console.log("Academic details saved")
-      console.log("Onboarding completed for:", user.id)
-      console.log("Redirecting to: /dashboard")
       
       router.push("/dashboard?welcome=true")
       router.refresh()
@@ -126,44 +117,23 @@ export default function DetailsOnboarding() {
               </Select>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-              <div className="space-y-4">
-                <Label className="text-base font-bold flex items-center gap-2 text-slate-300">
-                  Select Batch
-                </Label>
-                <Select 
-                  value={formData.batch} 
-                  onValueChange={(v) => setFormData({ ...formData, batch: v })}
-                >
-                  <SelectTrigger className="h-16 bg-black/20 border-white/10 rounded-2xl focus:ring-primary/20 text-lg text-white">
-                    <SelectValue placeholder="Batch" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-slate-900 border-white/10 text-white">
-                    {batches.map((batch) => (
-                      <SelectItem key={batch.id} value={batch.id}>{batch.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-4">
-                <Label className="text-base font-bold flex items-center gap-2 text-slate-300">
-                  Current Semester
-                </Label>
-                <Select 
-                  value={formData.semester} 
-                  onValueChange={(v) => setFormData({ ...formData, semester: v })}
-                >
-                  <SelectTrigger className="h-16 bg-black/20 border-white/10 rounded-2xl focus:ring-primary/20 text-lg text-white">
-                    <SelectValue placeholder="Semester" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-slate-900 border-white/10 text-white">
-                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((s) => (
-                      <SelectItem key={s} value={String(s)}>Semester {s}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+            <div className="space-y-4">
+              <Label className="text-base font-bold flex items-center gap-2 text-slate-300">
+                Select Batch
+              </Label>
+              <Select 
+                value={formData.batch} 
+                onValueChange={(v) => setFormData({ ...formData, batch: v })}
+              >
+                <SelectTrigger className="h-16 bg-black/20 border-white/10 rounded-2xl focus:ring-primary/20 text-lg text-white">
+                  <SelectValue placeholder="Batch" />
+                </SelectTrigger>
+                <SelectContent className="bg-slate-900 border-white/10 text-white">
+                  {batches.map((batch) => (
+                    <SelectItem key={batch.id} value={batch.id}>{batch.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="flex flex-col sm:flex-row items-center gap-4 pt-6">

@@ -1,14 +1,17 @@
-import { createClient } from "@/lib/supabase/server"
 import { NextRequest, NextResponse } from "next/server"
 import { withRateLimit } from "@/lib/rate-limit"
+import { requireAdmin } from "@/lib/admin/api-auth"
 
 const PAGE_SIZE = 50
 
 export async function GET(request: NextRequest) {
-  const limited = withRateLimit(request)
+  const limited = await withRateLimit(request)
   if (limited) return limited
 
-  const supabase = await createClient()
+  const auth = await requireAdmin()
+  if (auth.response) return auth.response
+
+  const supabase = auth.supabase
   const { searchParams } = request.nextUrl
   const page = Math.max(0, parseInt(searchParams.get("page") ?? "0", 10))
   const limit = Math.min(200, parseInt(searchParams.get("limit") ?? String(PAGE_SIZE), 10))
@@ -29,10 +32,13 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const limited = withRateLimit(request)
+  const limited = await withRateLimit(request)
   if (limited) return limited
 
-  const supabase = await createClient()
+  const auth = await requireAdmin()
+  if (auth.response) return auth.response
+
+  const supabase = auth.supabase
   const body = await request.json()
 
   const { data, error } = await supabase

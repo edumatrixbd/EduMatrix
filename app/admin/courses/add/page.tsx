@@ -1,9 +1,9 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { motion } from "framer-motion"
-import { Card, CardContent } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -15,208 +15,277 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { ArrowLeft } from "lucide-react"
+import { ArrowLeft, Loader2, Sparkles } from "lucide-react"
 import Link from "next/link"
+import { createClient } from "@/lib/supabase/client"
+import { toast } from "sonner"
 
 export default function AddCoursePage() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
+  
+  // Data Lists
+  const [universities, setUniversities] = useState<any[]>([])
+  const [departments, setDepartments] = useState<any[]>([])
+  const [batches, setBatches] = useState<any[]>([])
+  const [semesters, setSemesters] = useState<any[]>([])
+  const [instructors, setInstructors] = useState<any[]>([])
+
   const [formData, setFormData] = useState({
     course_code: "",
     course_name: "",
     description: "",
-    instructor: "",
+    instructor_id: "",
     credits: "3",
-    semester: "1",
+    semester: "1", // Numeric fallback
+    semester_id: "", // Named term ID
     price: "0",
     status: "active",
+    university_id: "",
+    department_id: "",
+    batch_id: "",
+    category: "Mid",
   })
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value })
+  useEffect(() => {
+    fetchInitialData()
+  }, [])
+
+  useEffect(() => {
+    if (formData.university_id) fetchHierarchyForUni(formData.university_id)
+  }, [formData.university_id])
+
+  useEffect(() => {
+    if (formData.university_id && formData.department_id) {
+      fetchBatches(formData.university_id, formData.department_id)
+    }
+  }, [formData.university_id, formData.department_id])
+
+  const fetchInitialData = async () => {
+    const supabase = createClient()
+    const [uniRes, instRes] = await Promise.all([
+      supabase.from('universities').select('*').eq('status', 'active').order('name'),
+      supabase.from('profiles').select('id, full_name').eq('role', 'instructor')
+    ])
+    if (uniRes.data) setUniversities(uniRes.data)
+    if (instRes.data) setInstructors(instRes.data)
   }
 
-  const handleSelectChange = (name: string, value: string) => {
-    setFormData({ ...formData, [name]: value })
+  const fetchHierarchyForUni = async (uniId: string) => {
+    const supabase = createClient()
+    const [deptRes, semRes] = await Promise.all([
+      supabase.from('departments').select('*').eq('university_id', uniId).eq('status', 'active').order('name'),
+      supabase.from('semesters').select('*').eq('university_id', uniId).eq('status', 'active').order('created_at', { ascending: false })
+    ])
+    if (deptRes.data) setDepartments(deptRes.data)
+    if (semRes.data) setSemesters(semRes.data)
+  }
+
+  const fetchBatches = async (uniId: string, deptId: string) => {
+    const supabase = createClient()
+    const { data } = await supabase.from('academic_batches').select('*').match({ university_id: uniId, department_id: deptId, status: 'active' }).order('batch_number')
+    if (data) setBatches(data)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     try {
-      const response = await fetch("/api/admin/courses", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ 
-          ...formData, 
-          credits: parseInt(formData.credits), 
-          semester: parseInt(formData.semester),
-          price: parseFloat(formData.price)
-        }),
-      })
-      if (response.ok) {
-        router.push("/admin/courses")
-      } else {
-        const data = await response.json()
-        alert(data.error || "Failed to add course")
+      const supabase = createClient()
+      
+      // Get the short names for compatibility with legacy string-based columns
+      const uni = universities.find(u => u.id === formData.university_id)
+      const dept = departments.find(d => d.id === formData.department_id)
+      const batch = batches.find(b => b.id === formData.batch_id)
+
+      const payload = {
+        ...formData,
+        university: uni?.short_name,
+        department: dept?.short_name,
+        batch: batch?.batch_number,
+        credits: parseInt(formData.credits),
+        semester: parseInt(formData.semester),
+        price: parseFloat(formData.price),
+        instructor: instructors.find(i => i.id === formData.instructor_id)?.full_name
       }
-    } catch (error) {
+
+      const { error } = await supabase.from('courses').insert(payload)
+      if (error) throw error
+      
+      toast.success("Course added successfully!")
+      router.push("/admin/courses")
+    } catch (error: any) {
       console.error("Error adding course:", error)
-      alert("An unexpected error occurred")
+      toast.error(error.message || "Failed to add course")
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <div className="space-y-8">
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-        className="flex items-center gap-4"
-      >
+    <div className="space-y-8 pb-20">
+      <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} className="flex items-center gap-4">
         <Link href="/admin/courses">
-          <Button variant="ghost" size="icon">
-            <ArrowLeft className="w-4 h-4" />
+          <Button variant="ghost" size="icon" className="rounded-xl">
+            <ArrowLeft className="w-5 h-5" />
           </Button>
         </Link>
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Add New Course</h1>
-          <p className="text-muted-foreground">Fill in the course details below</p>
+          <h1 className="text-3xl font-black text-foreground">Add New Course</h1>
+          <p className="text-muted-foreground font-medium">Define academic content and subscription targeting</p>
         </div>
       </motion.div>
 
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.1 }}
-        className="max-w-2xl"
-      >
-        <Card>
-          <CardContent className="p-6">
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="lg:col-span-2">
+          <Card className="border-border/50 shadow-xl shadow-black/5 rounded-[2.5rem] overflow-hidden">
+            <CardContent className="p-10 space-y-8">
+              <div className="grid grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <Label htmlFor="course_code">Course Code *</Label>
+                  <Label className="text-[10px] font-black uppercase tracking-widest ml-1 text-slate-500">Course Code *</Label>
                   <Input
-                    id="course_code"
-                    name="course_code"
                     value={formData.course_code}
-                    onChange={handleChange}
-                    placeholder="CSE-101"
+                    onChange={(e) => setFormData({ ...formData, course_code: e.target.value })}
+                    placeholder="CSE-201"
+                    className="h-14 bg-background border-border/50 rounded-2xl font-bold"
                     required
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="course_name">Course Name *</Label>
+                  <Label className="text-[10px] font-black uppercase tracking-widest ml-1 text-slate-500">Course Name *</Label>
                   <Input
-                    id="course_name"
-                    name="course_name"
                     value={formData.course_name}
-                    onChange={handleChange}
-                    placeholder="Web Development"
+                    onChange={(e) => setFormData({ ...formData, course_name: e.target.value })}
+                    placeholder="Data Structures"
+                    className="h-14 bg-background border-border/50 rounded-2xl font-bold"
                     required
                   />
                 </div>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="description">Description</Label>
+                <Label className="text-[10px] font-black uppercase tracking-widest ml-1 text-slate-500">Description</Label>
                 <Textarea
-                  id="description"
-                  name="description"
                   value={formData.description}
-                  onChange={handleChange}
-                  placeholder="Course description..."
-                  rows={4}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  placeholder="Provide a brief overview of the course curriculum..."
+                  className="bg-background border-border/50 rounded-2xl min-h-[150px] p-6"
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="instructor">Instructor *</Label>
-                  <Input
-                    id="instructor"
-                    name="instructor"
-                    value={formData.instructor}
-                    onChange={handleChange}
-                    placeholder="Dr. John Doe"
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="price">Price (৳) *</Label>
-                  <Input
-                    id="price"
-                    name="price"
-                    type="number"
-                    min="0"
-                    value={formData.price}
-                    onChange={handleChange}
-                    placeholder="0.00"
-                    required
-                  />
-                </div>
+              <div className="grid grid-cols-2 gap-6">
+                 <div className="space-y-2">
+                    <Label className="text-[10px] font-black uppercase tracking-widest ml-1 text-slate-500">Instructor *</Label>
+                    <Select value={formData.instructor_id} onValueChange={(v) => setFormData({ ...formData, instructor_id: v })}>
+                      <SelectTrigger className="h-14 bg-background border-border/50 rounded-2xl">
+                        <SelectValue placeholder="Select Instructor" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-slate-900 border-white/10 text-white">
+                        {instructors.map(inst => <SelectItem key={inst.id} value={inst.id}>{inst.full_name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                 </div>
+                 <div className="space-y-2">
+                   <Label className="text-[10px] font-black uppercase tracking-widest ml-1 text-slate-500">Subscription Price (৳) *</Label>
+                   <Input
+                     type="number"
+                     value={formData.price}
+                     onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                     className="h-14 bg-background border-border/50 rounded-2xl font-black text-xl text-primary"
+                     required
+                   />
+                 </div>
               </div>
+            </CardContent>
+          </Card>
+        </div>
 
-              <div className="grid grid-cols-3 gap-4">
+        <div className="space-y-8">
+           <Card className="border-border/50 shadow-xl shadow-black/5 rounded-[2.5rem] overflow-hidden">
+             <CardHeader className="bg-muted/30 border-b border-border/50 p-8">
+                <CardTitle className="text-xl font-black flex items-center gap-2">
+                   <Sparkles className="w-5 h-5 text-primary" /> Targeting
+                </CardTitle>
+             </CardHeader>
+             <CardContent className="p-8 space-y-6">
                 <div className="space-y-2">
-                  <Label htmlFor="credits">Credits *</Label>
-                  <Input
-                    id="credits"
-                    name="credits"
-                    type="number"
-                    min="1"
-                    max="6"
-                    value={formData.credits}
-                    onChange={handleChange}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="semester">Semester *</Label>
-                  <Select value={formData.semester} onValueChange={(value) => handleSelectChange("semester", value)}>
-                    <SelectTrigger>
-                      <SelectValue />
+                  <Label className="text-[10px] font-black uppercase tracking-widest ml-1 text-slate-500">University *</Label>
+                  <Select value={formData.university_id} onValueChange={(v) => setFormData({ ...formData, university_id: v })}>
+                    <SelectTrigger className="h-12 bg-background border-border/50 rounded-xl">
+                      <SelectValue placeholder="Select Institution" />
                     </SelectTrigger>
-                    <SelectContent>
-                      {[1, 2, 3, 4, 5, 6, 7, 8].map((sem) => (
-                        <SelectItem key={sem} value={String(sem)}>
-                          Semester {sem}
-                        </SelectItem>
-                      ))}
+                    <SelectContent className="bg-slate-900 border-white/10 text-white">
+                      {universities.map(u => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
+
                 <div className="space-y-2">
-                  <Label htmlFor="status">Status</Label>
-                  <Select value={formData.status} onValueChange={(value) => handleSelectChange("status", value)}>
-                    <SelectTrigger>
-                      <SelectValue />
+                  <Label className="text-[10px] font-black uppercase tracking-widest ml-1 text-slate-500">Department *</Label>
+                  <Select value={formData.department_id} onValueChange={(v) => setFormData({ ...formData, department_id: v })} disabled={!formData.university_id}>
+                    <SelectTrigger className="h-12 bg-background border-border/50 rounded-xl">
+                      <SelectValue placeholder="Select Department" />
                     </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="active">Active</SelectItem>
-                      <SelectItem value="inactive">Inactive</SelectItem>
+                    <SelectContent className="bg-slate-900 border-white/10 text-white">
+                      {departments.map(d => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
-              </div>
 
-              <div className="flex gap-4">
-                <Button type="submit" disabled={loading}>
-                  {loading ? "Adding..." : "Add Course"}
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-black uppercase tracking-widest ml-1 text-slate-500">Academic Term (Semester) *</Label>
+                  <Select value={formData.semester_id} onValueChange={(v) => setFormData({ ...formData, semester_id: v })} disabled={!formData.university_id}>
+                    <SelectTrigger className="h-12 bg-background border-border/50 rounded-xl">
+                      <SelectValue placeholder="Select Semester Term" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-slate-900 border-white/10 text-white">
+                      {semesters.map(s => <SelectItem key={s.id} value={s.id}>{s.name} {s.is_current && "(Current)"}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-black uppercase tracking-widest ml-1 text-slate-500">Batch Cohort *</Label>
+                  <Select value={formData.batch_id} onValueChange={(v) => setFormData({ ...formData, batch_id: v })} disabled={!formData.department_id}>
+                    <SelectTrigger className="h-12 bg-background border-border/50 rounded-xl">
+                      <SelectValue placeholder="Select Batch" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-slate-900 border-white/10 text-white">
+                      {batches.map(b => <SelectItem key={b.id} value={b.id}>Batch {b.batch_number}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label className="text-[10px] font-black uppercase tracking-widest ml-1 text-slate-500">Level (Numeric)</Label>
+                    <Input type="number" value={formData.semester} onChange={(e) => setFormData({...formData, semester: e.target.value})} className="h-12 rounded-xl" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-[10px] font-black uppercase tracking-widest ml-1 text-slate-500">Status</Label>
+                    <Select value={formData.status} onValueChange={(v) => setFormData({...formData, status: v})}>
+                      <SelectTrigger className="h-12 rounded-xl">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-slate-900 border-white/10 text-white">
+                        <SelectItem value="active">Active</SelectItem>
+                        <SelectItem value="inactive">Inactive</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <Button 
+                  onClick={handleSubmit} 
+                  disabled={loading || !formData.batch_id || !formData.semester_id}
+                  className="w-full h-14 bg-primary hover:bg-primary/90 text-white font-black rounded-2xl shadow-xl shadow-primary/20 mt-4"
+                >
+                  {loading ? <Loader2 className="animate-spin w-5 h-5" /> : "Publish Course"}
                 </Button>
-                <Link href="/admin/courses">
-                  <Button variant="outline">Cancel</Button>
-                </Link>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
-      </motion.div>
+             </CardContent>
+           </Card>
+        </div>
+      </div>
     </div>
   )
 }

@@ -1,23 +1,20 @@
 "use client"
 
-import * as React from "react"
-import { motion, AnimatePresence } from "framer-motion"
+import { useState, useEffect } from "react"
+import { motion } from "framer-motion"
 import { 
-  History, 
-  Search, 
+  FileSearch, 
+  User, 
+  Calendar, 
   Filter, 
-  Video, 
-  FileText, 
-  FileQuestion, 
-  Download, 
-  BookOpenCheck,
-  MousePointer2,
-  Clock,
-  ArrowUpRight,
-  Loader2,
-  Trash2,
-  DownloadCloud,
-  Activity
+  Search, 
+  Loader2, 
+  Database,
+  ArrowUpDown,
+  History,
+  ShieldCheck,
+  CreditCard,
+  UserPlus
 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -31,220 +28,197 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import { createClient } from "@/lib/supabase/client"
-import { format, formatDistanceToNow } from "date-fns"
+import { toast } from "sonner"
+import { format } from "date-fns"
+import { PermissionGuard } from "@/components/admin/permission-guard"
 
-const featureIcons: Record<string, any> = {
-  video: Video,
-  notes: FileText,
-  questions: FileQuestion,
-  solves: BookOpenCheck,
-  study_zone: MousePointer2,
-  search: Search,
-  download: DownloadCloud,
-}
+export default function ActivityLogsPage() {
+  const [loading, setLoading] = useState(true)
+  const [logs, setLogs] = useState<any[]>([])
+  const [search, setSearch] = useState("")
 
-const featureColors: Record<string, string> = {
-  video: "text-sky-400 bg-sky-400/10",
-  notes: "text-emerald-400 bg-emerald-400/10",
-  questions: "text-amber-400 bg-amber-400/10",
-  solves: "text-violet-400 bg-violet-400/10",
-  study_zone: "text-rose-400 bg-rose-400/10",
-  search: "text-slate-400 bg-slate-400/10",
-  download: "text-indigo-400 bg-indigo-400/10",
-}
-
-export default function AdminActivityLogsPage() {
-  const [loading, setLoading] = React.useState(true)
-  const [logs, setLogs] = React.useState<any[]>([])
-  const [search, setSearch] = React.useState("")
-  const [typeFilter, setTypeFilter] = React.useState<string>("all")
-
-  React.useEffect(() => {
+  useEffect(() => {
     fetchLogs()
-    
-    // Set up real-time subscription
-    const supabase = createClient()
-    const subscription = supabase
-      .channel('activity_logs_realtime')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'activity_logs' }, payload => {
-        fetchLogs() // Simple refresh for now
-      })
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(subscription)
-    }
   }, [])
 
   const fetchLogs = async () => {
     try {
       const supabase = createClient()
-      const { data, error } = await supabase
-        .from("activity_logs")
-        .select(`
-          *,
-          student:students(name, email)
-        `)
-        .order("created_at", { ascending: false })
-        .limit(100)
       
-      if (error) throw error
-      setLogs(data || [])
+      // Step 1: Fetch activity logs first
+      const { data: logsData, error: logsError } = await supabase
+        .from("activity_logs")
+        .select("*")
+        .order("created_at", { ascending: false })
+      
+      if (logsError) throw logsError
+      if (!logsData) {
+        setLogs([])
+        return
+      }
+
+      // Step 2: Manually fetch profiles for these logs to bypass missing DB relationship
+      const adminIds = Array.from(new Set(logsData.map(log => log.admin_id).filter(Boolean)))
+      
+      if (adminIds.length > 0) {
+        const { data: profilesData, error: profilesError } = await supabase
+          .from("profiles")
+          .select("id, full_name, email, role")
+          .in("id", adminIds)
+        
+        if (profilesError) {
+          console.error("Error fetching profiles for logs:", profilesError)
+        } else {
+          // Create a lookup map for profiles
+          const profilesMap = (profilesData || []).reduce((acc: any, p: any) => {
+            acc[p.id] = p
+            return acc
+          }, {})
+
+          // Enrich logs with profile data
+          const enrichedLogs = logsData.map(log => ({
+            ...log,
+            profiles: log.admin_id ? profilesMap[log.admin_id] : null
+          }))
+
+          setLogs(enrichedLogs)
+          return
+        }
+      }
+
+      setLogs(logsData)
     } catch (error: any) {
       console.error("Error fetching logs:", JSON.stringify(error, null, 2))
-      if (error?.code === "42P01" || error?.code === "PGRST205") {
-        toast.error("Database table 'activity_logs' missing. Please run the SQL script.")
-      }
     } finally {
       setLoading(false)
     }
   }
 
-  const filteredLogs = logs.filter(log => {
-    const matchesSearch = 
-      log.student?.name?.toLowerCase().includes(search.toLowerCase()) ||
-      log.action?.toLowerCase().includes(search.toLowerCase()) ||
-      log.metadata?.title?.toLowerCase().includes(search.toLowerCase())
-    
-    const matchesType = typeFilter === "all" || log.feature === typeFilter
-    
-    return matchesSearch && matchesType
-  })
+  const getActionIcon = (action: string) => {
+    if (action.includes('APPROVE_INSTRUCTOR')) return <ShieldCheck className="w-4 h-4 text-emerald-400" />
+    if (action.includes('APPROVE_PAYMENT')) return <CreditCard className="w-4 h-4 text-primary" />
+    if (action.includes('CREATE_ADMIN')) return <UserPlus className="w-4 h-4 text-primary" />
+    return <History className="w-4 h-4 text-slate-500 dark:text-slate-400" />
+  }
 
-  if (loading) return <div className="flex items-center justify-center min-h-[400px]"><Loader2 className="animate-spin" /></div>
+  const filteredLogs = logs.filter(log => 
+    log.action.toLowerCase().includes(search.toLowerCase()) ||
+    log.profiles?.full_name?.toLowerCase().includes(search.toLowerCase()) ||
+    log.target_type?.toLowerCase().includes(search.toLowerCase())
+  )
 
   return (
-    <div className="space-y-8">
+    <PermissionGuard permission="activity_logs_view">
+      <div className="space-y-8">
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">Activity Logs</h1>
-          <p className="text-muted-foreground mt-1">Real-time monitoring of all platform interactions.</p>
+        <div className="space-y-1">
+          <h1 className="text-3xl font-bold tracking-tight">System Activity Logs</h1>
+          <p className="text-muted-foreground text-lg">Track every administrative action made across the platform.</p>
         </div>
-        <div className="flex items-center gap-2">
-          <Badge variant="outline" className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20 px-3 py-1 animate-pulse">
-            <Activity className="w-3 h-3 mr-1.5" /> Live Monitoring Active
-          </Badge>
-          <Button variant="outline" size="sm" onClick={fetchLogs} className="border-white/10">
-            Refresh
-          </Button>
-        </div>
+        <Button variant="outline" className="border-slate-200 dark:border-white/10" onClick={fetchLogs}>
+          <Database className="w-4 h-4 mr-2" /> Refresh Data
+        </Button>
       </motion.div>
 
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row items-center gap-4">
-        <div className="relative flex-1 w-full">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input 
-            placeholder="Search activity, student, or content..." 
-            className="pl-9 bg-muted/30 border-white/10"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
-        <Select value={typeFilter} onValueChange={setTypeFilter}>
-          <SelectTrigger className="w-full sm:w-[200px] bg-muted/30 border-white/10">
-            <SelectValue placeholder="All Features" />
-          </SelectTrigger>
-          <SelectContent className="bg-slate-900 border-white/10">
-            <SelectItem value="all">All Features</SelectItem>
-            <SelectItem value="video">Videos</SelectItem>
-            <SelectItem value="notes">Notes</SelectItem>
-            <SelectItem value="questions">Questions</SelectItem>
-            <SelectItem value="solves">Solved Answers</SelectItem>
-            <SelectItem value="study_zone">Study Zone</SelectItem>
-            <SelectItem value="download">Downloads</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
-      {/* Logs Feed */}
-      <Card className="border-white/5 bg-card/50 backdrop-blur-sm">
+      <Card className="border-slate-200 dark:border-white/5 bg-white/50 dark:bg-card/50 backdrop-blur-sm shadow-xl">
+        <CardHeader className="border-b border-slate-200 dark:border-white/5 p-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <CardTitle className="text-lg flex items-center gap-2 font-bold">
+              <FileSearch className="w-5 h-5 text-primary" />
+              Recent Actions
+            </CardTitle>
+            <div className="flex items-center gap-2">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input 
+                  placeholder="Filter by action or user..." 
+                  className="pl-9 w-64 bg-muted/30 border-slate-200 dark:border-white/10"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+              </div>
+              <Button variant="outline" size="icon" className="border-slate-200 dark:border-white/10">
+                <Filter className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
             <Table>
               <TableHeader className="bg-muted/30">
-                <TableRow className="border-white/5 hover:bg-transparent">
-                  <TableHead className="w-[200px]">Student</TableHead>
-                  <TableHead>Activity</TableHead>
-                  <TableHead>Target Content</TableHead>
-                  <TableHead>Time</TableHead>
-                  <TableHead className="text-right">Details</TableHead>
+                <TableRow className="border-slate-200 dark:border-white/5">
+                  <TableHead className="w-[180px]">Admin</TableHead>
+                  <TableHead className="w-[200px]">Action</TableHead>
+                  <TableHead>Target</TableHead>
+                  <TableHead>Details</TableHead>
+                  <TableHead className="text-right">Timestamp</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                <AnimatePresence mode="popLayout">
-                  {filteredLogs.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={5} className="h-32 text-center text-muted-foreground">
-                        No activity logs found.
+                {loading ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="h-64 text-center">
+                      <Loader2 className="w-8 h-8 animate-spin mx-auto text-primary" />
+                      <p className="mt-2 text-sm text-muted-foreground">Loading system logs...</p>
+                    </TableCell>
+                  </TableRow>
+                ) : filteredLogs.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="h-32 text-center text-muted-foreground">
+                      No activity logs found.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredLogs.map((log) => (
+                    <TableRow key={log.id} className="border-slate-200 dark:border-white/5 hover:bg-slate-100 dark:hover:bg-white/[0.01] transition-colors group">
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary text-xs font-bold">
+                            {log.profiles?.full_name?.[0]}
+                          </div>
+                          <div className="flex flex-col min-w-0">
+                            <span className="text-sm font-semibold truncate">{log.profiles?.full_name}</span>
+                            <span className="text-[10px] text-muted-foreground uppercase tracking-wider">{log.profiles?.role?.replace('_', ' ')}</span>
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <div className="p-1.5 rounded-md bg-slate-50 dark:bg-white/5 group-hover:bg-primary/10 transition-colors">
+                            {getActionIcon(log.action)}
+                          </div>
+                          <span className="text-sm font-medium">{log.action.replace(/_/g, ' ')}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {log.target_type && (
+                          <Badge variant="outline" className="capitalize text-[10px] border-slate-200 dark:border-white/10 text-slate-500 dark:text-slate-400">
+                            {log.target_type}
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-xs text-muted-foreground font-mono">
+                          {JSON.stringify(log.details)}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex flex-col items-end">
+                          <span className="text-sm font-medium">{format(new Date(log.created_at), 'MMM dd, yyyy')}</span>
+                          <span className="text-[10px] text-muted-foreground">{format(new Date(log.created_at), 'HH:mm:ss')}</span>
+                        </div>
                       </TableCell>
                     </TableRow>
-                  ) : (
-                    filteredLogs.map((log) => {
-                      const Icon = featureIcons[log.feature] || MousePointer2
-                      const colorClass = featureColors[log.feature] || "text-slate-400 bg-slate-400/10"
-                      
-                      return (
-                        <TableRow 
-                          key={log.id} 
-                          className="border-white/5 hover:bg-white/[0.02] transition-colors"
-                        >
-                          <TableCell>
-                            <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-bold text-primary">
-                                {log.student?.name?.split(' ').map((n: any) => n[0]).join('')}
-                              </div>
-                              <div className="flex flex-col min-w-0">
-                                <span className="text-xs font-semibold text-foreground truncate">{log.student?.name}</span>
-                                <span className="text-[10px] text-muted-foreground truncate">{log.student?.email}</span>
-                              </div>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-2">
-                              <div className={`p-1.5 rounded-lg ${colorClass}`}>
-                                <Icon className="w-3.5 h-3.5" />
-                              </div>
-                              <span className="text-xs font-medium capitalize">{log.action} {log.feature}</span>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex flex-col">
-                              <span className="text-xs font-medium text-foreground truncate max-w-[250px]">
-                                {log.metadata?.title || 'System Action'}
-                              </span>
-                              <span className="text-[10px] text-muted-foreground italic">
-                                {log.metadata?.course || 'General'}
-                              </span>
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
-                            {formatDistanceToNow(new Date(log.created_at), { addSuffix: true })}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground">
-                              <ArrowUpRight className="w-3.5 h-3.5" />
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      )
-                    })
-                  )}
-                </AnimatePresence>
+                  ))
+                )}
               </TableBody>
             </Table>
           </div>
         </CardContent>
       </Card>
     </div>
+    </PermissionGuard>
   )
 }
-import { cn } from "@/lib/utils"

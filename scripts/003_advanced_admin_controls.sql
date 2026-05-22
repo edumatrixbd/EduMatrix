@@ -14,15 +14,15 @@ ADD COLUMN IF NOT EXISTS category TEXT DEFAULT 'mid'; -- 'mid', 'final'
 -- Create site_settings table
 CREATE TABLE IF NOT EXISTS public.site_settings (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  promo_banner_text TEXT DEFAULT 'Welcome to EduMatrix! Join our exam preparation series now.',
+  promo_banner_text TEXT DEFAULT 'Welcome to tensionনাই! Join our exam preparation series now.',
   promo_banner_cta TEXT DEFAULT 'Join Now',
   show_promo_banner BOOLEAN DEFAULT TRUE,
   maintenance_mode BOOLEAN DEFAULT FALSE,
-  contact_email TEXT DEFAULT 'support@edumatrix.com',
+  contact_email TEXT DEFAULT 'support@tensionনাই.com',
   contact_phone TEXT DEFAULT '+880123456789',
   social_links JSONB DEFAULT '{"facebook": "#", "twitter": "#", "github": "#", "linkedin": "#"}'::JSONB,
-  seo_title TEXT DEFAULT 'EduMatrix - EduMatrix Student Portal',
-  seo_description TEXT DEFAULT 'Your one-stop destination for EduMatrix courses, notes, and exam preparation.',
+  seo_title TEXT DEFAULT 'tensionনাই - tensionনাই Student Portal',
+  seo_description TEXT DEFAULT 'Your one-stop destination for tensionনাই courses, notes, and exam preparation.',
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW())
 );
 

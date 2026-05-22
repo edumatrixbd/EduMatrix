@@ -14,7 +14,7 @@ export default function SupabaseSetupPage() {
           </div>
           <CardTitle>Supabase is not configured</CardTitle>
           <CardDescription>
-            The admin panel needs your Supabase project URL and anon key before authentication can run.
+            The admin panel needs your Supabase project URL and publishable key before authentication can run.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-5">
@@ -29,7 +29,7 @@ export default function SupabaseSetupPage() {
 
           <div className="rounded-lg border bg-muted/30 p-4 text-sm">
             <pre className="whitespace-pre-wrap break-all">{`NEXT_PUBLIC_SUPABASE_URL=https://your-project-ref.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-supabase-publishable-key
 ADMIN_EMAILS=your-admin-email@example.com`}</pre>
           </div>
 
